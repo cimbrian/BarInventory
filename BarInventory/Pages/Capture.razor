@@ -1,0 +1,318 @@
+@page "/capture"
+@inject InventoryService InventoryService
+
+<PageTitle>Capture Inventory - Bar Inventory</PageTitle>
+
+<div class="page-header">
+    <h1 class="page-title">Capture Inventory</h1>
+    <p class="page-subtitle">
+        @if (_currentSession != null)
+        {
+            <span>@_countedItems/@_totalItems products counted</span>
+        }
+        else
+        {
+            <span>No active session - create one to start counting</span>
+        }
+    </p>
+</div>
+
+@if (_currentSession == null)
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="empty-state">
+                <div class="empty-state-icon">📋</div>
+                <h2 class="empty-state-title">No Active Session</h2>
+                <p class="empty-state-text">You need an active inventory session to capture counts.</p>
+                <a href="/sessions" class="btn btn-primary btn-lg">Start New Session</a>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    @* Progress Bar *@
+    <div class="progress-bar mb-md" style="height: 8px;">
+        <div class="progress-fill" style="width: @((_countedItems / (decimal)Math.Max(_totalItems, 1)) * 100)%"></div>
+    </div>
+    
+    @* Area Tabs *@
+    <div class="area-tabs">
+        <button class='area-tab @(_selectedAreaId == null ? "active" : "")' @onclick="() => SelectArea(null)">
+            All Areas
+            <span class="count-badge">@_totalItems</span>
+        </button>
+        @foreach (var area in _areas)
+        {
+            <button class='area-tab @(_selectedAreaId == area.Id ? "active" : "")' @onclick="() => SelectArea(area.Id)">
+                @area.Name
+                <span class="count-badge">@area.ShortCode</span>
+            </button>
+        }
+    </div>
+    
+    @* Category Pills *@
+    <div class="category-pills">
+        <button class='category-pill @(_selectedCategory == null ? "active" : "")' @onclick="() => SelectCategory(null)">
+            All
+        </button>
+        @foreach (var category in _categories)
+        {
+            <button class='category-pill @(_selectedCategory == category ? "active" : "")' @onclick="() => SelectCategory(category)">
+                @GetCategoryIcon(category) @GetCategoryName(category)
+            </button>
+        }
+    </div>
+    
+    @* Search *@
+    <div class="search-wrapper mb-md">
+        <span class="search-icon">🔍</span>
+        <input type="text" 
+               class="form-control" 
+               placeholder="Search products..." 
+               @bind="_searchQuery" 
+               @bind:event="oninput" />
+    </div>
+    
+    @* Product List *@
+    <div class="inventory-grid">
+        @foreach (var item in GetFilteredItems())
+        {
+            <div class='inventory-item @(item.LastCountedAt.HasValue ? "counted" : "")'>
+                <div class="item-header">
+                    <div>
+                        <div class="item-name">@item.Product?.DisplayName</div>
+                        <div class="item-meta">@item.Product?.SizeDescription • $@item.UnitCost.ToString("0.00")</div>
+                    </div>
+                    <span class="item-badge @GetCategoryBadgeClass(item.Product?.Category ?? ProductCategory.Other)">
+                        @GetCategoryName(item.Product?.Category ?? ProductCategory.Other)
+                    </span>
+                </div>
+                
+                @* Info Row *@
+                <div class="d-flex justify-between align-center gap-sm mt-sm" style="flex-wrap: wrap; font-size: 0.85rem;">
+                    <div>
+                        <span class="text-muted">Start:</span>
+                        <strong>@item.StartingQuantity.ToString("0.0")</strong>
+                    </div>
+                    <div>
+                        <span class="text-muted">Recv:</span>
+                        <strong>@item.ReceivedQuantity.ToString("0.0")</strong>
+                    </div>
+                    <div>
+                        <span class="text-muted">Total:</span>
+                        <strong>@item.TotalProduct.ToString("0.0")</strong>
+                    </div>
+                </div>
+                
+                @* Area Counts - Expandable *@
+                <details class="mt-md" @onclick:stopPropagation="true">
+                    <summary style="cursor: pointer; color: var(--accent-blue); font-size: 0.9rem;">
+                        📍 Count by Area (Current: @item.CurrentOnHand.ToString("0.0"))
+                    </summary>
+                    
+                    <div class="mt-sm" style="display: grid; gap: 0.75rem;">
+                        @foreach (var areaCount in item.AreaCounts)
+                        {
+                            <div style="background: var(--bg-tertiary); padding: 0.75rem; border-radius: var(--radius-md);">
+                                <div class="d-flex justify-between align-center mb-sm">
+                                    <strong style="font-size: 0.9rem;">@areaCount.AreaName</strong>
+                                    <span class="text-muted" style="font-size: 0.85rem;">
+                                        Total: @areaCount.TotalUnits.ToString("0.0")
+                                    </span>
+                                </div>
+                                
+                                <QuickCountInput 
+                                    Label="Count"
+                                    FullUnits="@areaCount.FullUnits"
+                                    FullUnitsChanged="@(val => UpdateAreaCount(item, areaCount, val, areaCount.PartialAmount, areaCount.HasPartial))"
+                                    PartialAmount="@areaCount.PartialAmount"
+                                    PartialAmountChanged="@(val => UpdateAreaCount(item, areaCount, areaCount.FullUnits, val, areaCount.HasPartial))"
+                                    HasPartial="@areaCount.HasPartial"
+                                    HasPartialChanged="@(val => UpdateAreaCount(item, areaCount, areaCount.FullUnits, areaCount.PartialAmount, val))"
+                                    ShowPartial="@ShouldShowPartial(item.Product?.Category)" />
+                            </div>
+                        }
+                    </div>
+                </details>
+                
+                @* Quick single count for simpler workflow *@
+                @if (_selectedAreaId.HasValue)
+                {
+                    var selectedArea = item.AreaCounts.FirstOrDefault(a => a.AreaId == _selectedAreaId.Value);
+                    if (selectedArea != null)
+                    {
+                        <div class="mt-md" style="background: var(--bg-tertiary); padding: 1rem; border-radius: var(--radius-md);">
+                            <QuickCountInput 
+                                Label="@($"Count in {selectedArea.AreaName}")"
+                                FullUnits="@selectedArea.FullUnits"
+                                FullUnitsChanged="@(val => UpdateAreaCount(item, selectedArea, val, selectedArea.PartialAmount, selectedArea.HasPartial))"
+                                PartialAmount="@selectedArea.PartialAmount"
+                                PartialAmountChanged="@(val => UpdateAreaCount(item, selectedArea, selectedArea.FullUnits, val, selectedArea.HasPartial))"
+                                HasPartial="@selectedArea.HasPartial"
+                                HasPartialChanged="@(val => UpdateAreaCount(item, selectedArea, selectedArea.FullUnits, selectedArea.PartialAmount, val))"
+                                ShowPartial="@ShouldShowPartial(item.Product?.Category)" />
+                        </div>
+                    }
+                }
+                
+                @* Received input *@
+                <div class="mt-sm d-flex gap-sm align-center">
+                    <label class="text-muted" style="font-size: 0.85rem; white-space: nowrap;">Received:</label>
+                    <input type="number" 
+                           class="form-control" 
+                           style="width: 80px; padding: 0.25rem 0.5rem; min-height: 36px;"
+                           step="1"
+                           min="0"
+                           value="@item.ReceivedQuantity"
+                           @onchange="@(e => UpdateReceived(item, e))" />
+                </div>
+                
+                @* Status indicator *@
+                @if (item.LastCountedAt.HasValue)
+                {
+                    <div class="mt-sm text-muted" style="font-size: 0.8rem;">
+                        ✓ Counted @item.LastCountedAt.Value.ToString("h:mm tt")
+                    </div>
+                }
+            </div>
+        }
+    </div>
+    
+    @if (!GetFilteredItems().Any())
+    {
+        <div class="empty-state">
+            <div class="empty-state-icon">🔍</div>
+            <h2 class="empty-state-title">No Products Found</h2>
+            <p class="empty-state-text">Try adjusting your filters or search query.</p>
+        </div>
+    }
+}
+
+@code {
+    private InventorySession? _currentSession;
+    private List<InventoryArea> _areas = new();
+    private List<InventoryItem> _items = new();
+    private List<ProductCategory> _categories = new();
+    
+    private int? _selectedAreaId;
+    private ProductCategory? _selectedCategory;
+    private string _searchQuery = "";
+    
+    private int _totalItems => _items.Count;
+    private int _countedItems => _items.Count(i => i.LastCountedAt.HasValue);
+    
+    protected override void OnInitialized()
+    {
+        LoadData();
+    }
+    
+    private void LoadData()
+    {
+        _currentSession = InventoryService.GetCurrentSession();
+        _areas = InventoryService.GetAllAreas();
+        
+        if (_currentSession != null)
+        {
+            _items = InventoryService.GetSessionItems(_currentSession.Id);
+            _categories = _items
+                .Where(i => i.Product != null)
+                .Select(i => i.Product!.Category)
+                .Distinct()
+                .OrderBy(c => c)
+                .ToList();
+        }
+    }
+    
+    private List<InventoryItem> GetFilteredItems()
+    {
+        var filtered = _items.AsEnumerable();
+        
+        if (_selectedCategory.HasValue)
+            filtered = filtered.Where(i => i.Product?.Category == _selectedCategory.Value);
+        
+        if (!string.IsNullOrWhiteSpace(_searchQuery))
+        {
+            var query = _searchQuery.ToLower();
+            filtered = filtered.Where(i => 
+                i.Product?.DisplayName.ToLower().Contains(query) == true ||
+                i.Product?.Brand.ToLower().Contains(query) == true);
+        }
+        
+        return filtered.OrderBy(i => i.Product?.Category).ThenBy(i => i.Product?.DisplayName).ToList();
+    }
+    
+    private void SelectArea(int? areaId)
+    {
+        _selectedAreaId = areaId;
+    }
+    
+    private void SelectCategory(ProductCategory? category)
+    {
+        _selectedCategory = category;
+    }
+    
+    private void UpdateAreaCount(InventoryItem item, AreaCount areaCount, int fullUnits, decimal partialAmount, bool hasPartial)
+    {
+        areaCount.FullUnits = fullUnits;
+        areaCount.PartialAmount = partialAmount;
+        areaCount.HasPartial = hasPartial;
+        item.LastCountedAt = DateTime.Now;
+        
+        InventoryService.UpdateInventoryItem(item);
+        StateHasChanged();
+    }
+    
+    private void UpdateReceived(InventoryItem item, ChangeEventArgs e)
+    {
+        if (decimal.TryParse(e.Value?.ToString(), out var received))
+        {
+            item.ReceivedQuantity = received;
+            item.ReceivedCost = received * item.UnitCost;
+            InventoryService.UpdateInventoryItem(item);
+        }
+    }
+    
+    private bool ShouldShowPartial(ProductCategory? category)
+    {
+        return category == ProductCategory.Liquor || 
+               category == ProductCategory.Wine ||
+               category == ProductCategory.DraftBeer;
+    }
+    
+    private string GetCategoryIcon(ProductCategory category) => category switch
+    {
+        ProductCategory.Liquor => "🥃",
+        ProductCategory.Wine => "🍷",
+        ProductCategory.BeerBottle => "🍺",
+        ProductCategory.BeerCan => "🥫",
+        ProductCategory.Seltzer => "✨",
+        ProductCategory.DraftBeer => "🍻",
+        ProductCategory.Mixers => "🧃",
+        _ => "📦"
+    };
+    
+    private string GetCategoryName(ProductCategory category) => category switch
+    {
+        ProductCategory.Liquor => "Liquor",
+        ProductCategory.Wine => "Wine",
+        ProductCategory.BeerBottle => "Bottles",
+        ProductCategory.BeerCan => "Cans",
+        ProductCategory.Seltzer => "Seltzers",
+        ProductCategory.DraftBeer => "Draft",
+        ProductCategory.Mixers => "Mixers",
+        _ => "Other"
+    };
+    
+    private string GetCategoryBadgeClass(ProductCategory category) => category switch
+    {
+        ProductCategory.Liquor => "badge-liquor",
+        ProductCategory.Wine => "badge-wine",
+        ProductCategory.BeerBottle => "badge-beer-bottle",
+        ProductCategory.BeerCan => "badge-beer-can",
+        ProductCategory.Seltzer => "badge-seltzer",
+        ProductCategory.DraftBeer => "badge-draft",
+        _ => ""
+    };
+}

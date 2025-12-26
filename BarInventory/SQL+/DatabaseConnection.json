@@ -1,0 +1,1 @@
+{"DatabaseType":"MSSQLServer","ConnectionString":"Server=tcp:cimsql.database.windows.net,1433;Initial Catalog=BarInventory;Persist Security Info=False;User ID=cimadmin;Password=1West!1West!;MultipleActiveResultSets=True;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;"}

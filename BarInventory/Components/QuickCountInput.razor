@@ -1,0 +1,119 @@
+@* Quick count input component for bar inventory
+   Supports system of 10s for partial bottles *@
+
+<div class="count-section">
+    <div class="count-label">@Label</div>
+    
+    <div class="count-controls">
+        @* Full units counter *@
+        <div class="full-count-group">
+            <button type="button" class="count-btn" @onclick="DecrementFull" disabled="@(FullUnits <= 0)">−</button>
+            <span class="count-value">@FullUnits</span>
+            <button type="button" class="count-btn" @onclick="IncrementFull">+</button>
+        </div>
+        
+        @if (ShowPartial)
+        {
+            <span class="text-muted" style="align-self: center;">+</span>
+            
+            @* Partial amount display *@
+            <div class="full-count-group">
+                <span class="count-value" style="min-width: 60px;">@(HasPartial ? $"{PartialAmount}/10" : "—")</span>
+            </div>
+        }
+    </div>
+    
+    @if (ShowPartial)
+    {
+        <div class="partial-section">
+            <div class="partial-toggle">
+                <div class='toggle-switch @(HasPartial ? "active" : "")' @onclick="TogglePartial"></div>
+                <span class="text-muted">Open bottle</span>
+            </div>
+            
+            @if (HasPartial)
+            {
+                <div class="tens-grid">
+                    @for (int i = 1; i <= 10; i++)
+                    {
+                        var level = i;
+                        <button type="button" 
+                                class='tens-btn @(PartialAmount == level ? "selected" : "")'
+                                @onclick="() => SetPartial(level)">
+                            @level
+                        </button>
+                    }
+                </div>
+                
+                @* Visual bottle fill indicator *@
+                <div class="bottle-visual">
+                    @for (int i = 1; i <= 10; i++)
+                    {
+                        <div class='bottle-segment @(i <= PartialAmount ? "filled" : "")'></div>
+                    }
+                </div>
+            }
+        </div>
+    }
+    
+    @* Total display *@
+    <div class="mt-sm text-muted" style="font-size: 0.9rem;">
+        Total: <strong style="color: var(--text-primary);">@TotalUnits.ToString("0.0")</strong> units
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = "Count";
+    [Parameter] public int FullUnits { get; set; }
+    [Parameter] public decimal PartialAmount { get; set; }
+    [Parameter] public bool HasPartial { get; set; }
+    [Parameter] public bool ShowPartial { get; set; } = true;
+    
+    [Parameter] public EventCallback<int> FullUnitsChanged { get; set; }
+    [Parameter] public EventCallback<decimal> PartialAmountChanged { get; set; }
+    [Parameter] public EventCallback<bool> HasPartialChanged { get; set; }
+    [Parameter] public EventCallback OnCountChanged { get; set; }
+    
+    private decimal TotalUnits => FullUnits + (HasPartial ? PartialAmount / 10m : 0);
+    
+    private async Task IncrementFull()
+    {
+        FullUnits++;
+        await FullUnitsChanged.InvokeAsync(FullUnits);
+        await OnCountChanged.InvokeAsync();
+    }
+    
+    private async Task DecrementFull()
+    {
+        if (FullUnits > 0)
+        {
+            FullUnits--;
+            await FullUnitsChanged.InvokeAsync(FullUnits);
+            await OnCountChanged.InvokeAsync();
+        }
+    }
+    
+    private async Task TogglePartial()
+    {
+        HasPartial = !HasPartial;
+        if (!HasPartial)
+        {
+            PartialAmount = 0;
+            await PartialAmountChanged.InvokeAsync(0);
+        }
+        else if (PartialAmount == 0)
+        {
+            PartialAmount = 5; // Default to half
+            await PartialAmountChanged.InvokeAsync(5);
+        }
+        await HasPartialChanged.InvokeAsync(HasPartial);
+        await OnCountChanged.InvokeAsync();
+    }
+    
+    private async Task SetPartial(int level)
+    {
+        PartialAmount = level;
+        await PartialAmountChanged.InvokeAsync(level);
+        await OnCountChanged.InvokeAsync();
+    }
+}

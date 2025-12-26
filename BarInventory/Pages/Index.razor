@@ -1,0 +1,211 @@
+@page "/"
+@inject InventoryService InventoryService
+
+<PageTitle>Dashboard - Bar Inventory</PageTitle>
+
+<div class="page-header">
+    <h1 class="page-title">Dashboard</h1>
+    <p class="page-subtitle">
+        @if (_currentSession != null)
+        {
+            <span>@_currentSession.SessionName • Started @_currentSession.SessionDate.ToString("MMM d, yyyy")</span>
+        }
+        else
+        {
+            <span>No active inventory session</span>
+        }
+    </p>
+</div>
+
+@if (_currentSession == null)
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="empty-state">
+                <div class="empty-state-icon">📋</div>
+                <h2 class="empty-state-title">No Active Session</h2>
+                <p class="empty-state-text">Start a new inventory session to begin counting.</p>
+                <a href="/sessions" class="btn btn-primary btn-lg">Start New Session</a>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    @* Stats Grid *@
+    <div class="stats-grid">
+        <StatCard 
+            Label="Inventory Value" 
+            Value="@_summary.TotalInventoryValue.ToString("C0")" />
+        
+        <StatCard 
+            Label="Products Counted" 
+            Value="@($"{_summary.ProductsCounted}/{_summary.TotalProducts}")"
+            Change="@($"{_summary.CompletionPercent:0}%")" />
+        
+        <StatCard 
+            Label="Total Variance" 
+            Value="@_summary.TotalVarianceValue.ToString("C0")"
+            ValueClass="@(_summary.TotalVarianceValue > 100 ? "danger" : _summary.TotalVarianceValue > 0 ? "warning" : "success")"
+            IsPositiveGood="false" />
+        
+        <StatCard 
+            Label="Losses Recorded" 
+            Value="@_summary.TotalLossValue.ToString("C0")"
+            ValueClass="@(_summary.TotalLossValue > 0 ? "warning" : "")" />
+    </div>
+    
+    @* Progress Card *@
+    <div class="card mb-md">
+        <div class="card-header">
+            <h3 class="card-title">Inventory Progress</h3>
+            <span class="text-muted">@_summary.CompletionPercent.ToString("0")% complete</span>
+        </div>
+        <div class="card-body">
+            <div class="progress-bar" style="height: 12px;">
+                <div class="progress-fill @GetProgressClass()" style="width: @_summary.CompletionPercent%"></div>
+            </div>
+            
+            <div class="d-flex justify-between mt-md gap-md" style="flex-wrap: wrap;">
+                <a href="/capture" class="btn btn-primary btn-lg" style="flex: 1; min-width: 200px;">
+                    📝 Continue Counting
+                </a>
+                @if (_summary.CompletionPercent >= 100)
+                {
+                    <button class="btn btn-success btn-lg" @onclick="CompleteSession" style="flex: 1; min-width: 200px;">
+                        ✓ Complete Session
+                    </button>
+                }
+            </div>
+        </div>
+    </div>
+    
+    @* Variance Alerts *@
+    @if (_summary.Alerts.Any())
+    {
+        <div class="card mb-md">
+            <div class="card-header">
+                <h3 class="card-title">⚠️ Variance Alerts</h3>
+                <span class="text-muted">@_summary.Alerts.Count items need attention</span>
+            </div>
+            <div class="card-body" style="padding: 0;">
+                <ul class="variance-list">
+                    @foreach (var alert in _summary.Alerts.Take(10))
+                    {
+                        <li class="variance-item">
+                            <div>
+                                <span class="variance-product">@alert.Product?.DisplayName</span>
+                                <span class="text-muted" style="display: block; font-size: 0.85rem;">
+                                    @GetSeverityLabel(alert.Severity)
+                                </span>
+                            </div>
+                            <span class='variance-amount @(alert.VarianceAmount > 0 ? "positive" : "negative")'>
+                                @(alert.VarianceAmount > 0 ? "+" : "")@alert.VarianceAmount.ToString("0.0") units
+                            </span>
+                        </li>
+                    }
+                </ul>
+            </div>
+            @if (_summary.Alerts.Count > 10)
+            {
+                <div class="card-footer">
+                    <a href="/lookup?filter=variance" class="btn btn-outline btn-sm">View All @_summary.Alerts.Count Alerts</a>
+                </div>
+            }
+        </div>
+    }
+    
+    @* Category Breakdown *@
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Inventory by Category</h3>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th class="number">Value</th>
+                            <th class="number">Variance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var category in Enum.GetValues<ProductCategory>())
+                        {
+                            var value = _summary.ValueByCategory.GetValueOrDefault(category);
+                            var variance = _summary.VarianceByCategory.GetValueOrDefault(category);
+                            @if (value > 0 || variance != 0)
+                            {
+                                <tr>
+                                    <td>@GetCategoryDisplayName(category)</td>
+                                    <td class="number">@value.ToString("C0")</td>
+                                    <td class='number @(variance > 0 ? "text-danger" : variance < 0 ? "text-success" : "")'>
+                                        @(variance != 0 ? variance.ToString("C0") : "—")
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private InventorySession? _currentSession;
+    private InventorySummary _summary = new();
+    
+    protected override void OnInitialized()
+    {
+        LoadData();
+    }
+    
+    private void LoadData()
+    {
+        _currentSession = InventoryService.GetCurrentSession();
+        if (_currentSession != null)
+        {
+            _summary = InventoryService.GetSessionSummary(_currentSession.Id);
+        }
+    }
+    
+    private string GetProgressClass()
+    {
+        if (_summary.CompletionPercent >= 100) return "success";
+        if (_summary.CompletionPercent >= 50) return "";
+        return "warning";
+    }
+    
+    private string GetSeverityLabel(VarianceSeverity severity) => severity switch
+    {
+        VarianceSeverity.Low => "Low variance",
+        VarianceSeverity.Medium => "Medium variance",
+        VarianceSeverity.High => "High variance - review needed",
+        VarianceSeverity.Critical => "Critical - possible theft",
+        _ => ""
+    };
+    
+    private string GetCategoryDisplayName(ProductCategory category) => category switch
+    {
+        ProductCategory.Liquor => "🥃 Liquor",
+        ProductCategory.Wine => "🍷 Wine",
+        ProductCategory.BeerBottle => "🍺 Beer (Bottles)",
+        ProductCategory.BeerCan => "🥫 Beer (Cans)",
+        ProductCategory.Seltzer => "✨ Seltzers",
+        ProductCategory.DraftBeer => "🍻 Draft Beer",
+        ProductCategory.Mixers => "🧃 Mixers",
+        ProductCategory.Other => "📦 Other",
+        _ => category.ToString()
+    };
+    
+    private void CompleteSession()
+    {
+        if (_currentSession != null)
+        {
+            InventoryService.CompleteSession(_currentSession.Id);
+            LoadData();
+        }
+    }
+}

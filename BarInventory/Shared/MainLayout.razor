@@ -1,0 +1,68 @@
+@inherits LayoutComponentBase
+
+<div class="page">
+    <nav class="top-nav">
+        <div class="nav-container">
+            <a href="/" class="nav-brand">
+                <span class="nav-brand-icon">🍸</span>
+                <span class="nav-brand-text">Bar Inventory</span>
+            </a>
+            <div class="nav-links">
+                <NavLink href="/" class="nav-link" Match="NavLinkMatch.All">
+                    <span class="nav-icon">📊</span>
+                    <span class="nav-text">Dashboard</span>
+                </NavLink>
+                <NavLink href="/capture" class="nav-link">
+                    <span class="nav-icon">📝</span>
+                    <span class="nav-text">Capture</span>
+                </NavLink>
+                <NavLink href="/lookup" class="nav-link">
+                    <span class="nav-icon">🔍</span>
+                    <span class="nav-text">Lookup</span>
+                </NavLink>
+                <NavLink href="/losses" class="nav-link">
+                    <span class="nav-icon">📉</span>
+                    <span class="nav-text">Losses</span>
+                </NavLink>
+                <NavLink href="/products" class="nav-link">
+                    <span class="nav-icon">📦</span>
+                    <span class="nav-text">Products</span>
+                </NavLink>
+                <NavLink href="/sessions" class="nav-link">
+                    <span class="nav-icon">📅</span>
+                    <span class="nav-text">Sessions</span>
+                </NavLink>
+            </div>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        @Body
+    </main>
+</div>
+
+<style>
+    /* Error UI styling */
+    #blazor-error-ui {
+        background: var(--status-danger);
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 1rem;
+        display: none;
+        z-index: 9999;
+        color: white;
+        text-align: center;
+    }
+    
+    #blazor-error-ui .dismiss {
+        cursor: pointer;
+        margin-left: 1rem;
+    }
+    
+    #blazor-error-ui .reload {
+        color: white;
+        margin-left: 1rem;
+    }
+</style>

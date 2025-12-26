@@ -1,0 +1,320 @@
+@page "/lookup"
+@inject InventoryService InventoryService
+
+<PageTitle>Lookup - Bar Inventory</PageTitle>
+
+<div class="page-header">
+    <h1 class="page-title">Lookup Products</h1>
+    <p class="page-subtitle">Search and view inventory details</p>
+</div>
+
+@* Search Bar *@
+<div class="card mb-md">
+    <div class="card-body">
+        <div class="search-wrapper">
+            <span class="search-icon">🔍</span>
+            <input type="text" 
+                   class="form-control form-control-lg" 
+                   placeholder="Search by name, brand, or SKU..." 
+                   @bind="_searchQuery" 
+                   @bind:event="oninput"
+                   @onkeyup="HandleSearch" />
+        </div>
+        
+        @* Quick Filters *@
+        <div class="d-flex gap-sm mt-md" style="flex-wrap: wrap;">
+            <button class='btn @(_filterMode == "all" ? "btn-primary" : "btn-outline") btn-sm' @onclick='() => SetFilter("all")'>
+                All Products
+            </button>
+            <button class='btn @(_filterMode == "variance" ? "btn-primary" : "btn-outline") btn-sm' @onclick='() => SetFilter("variance")'>
+                ⚠️ With Variance
+            </button>
+            <button class='btn @(_filterMode == "uncounted" ? "btn-primary" : "btn-outline") btn-sm' @onclick='() => SetFilter("uncounted")'>
+                📝 Uncounted
+            </button>
+            <button class='btn @(_filterMode == "lowstock" ? "btn-primary" : "btn-outline") btn-sm' @onclick='() => SetFilter("lowstock")'>
+                📉 Low Stock
+            </button>
+        </div>
+    </div>
+</div>
+
+@* Results *@
+@if (_results.Any())
+{
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Results</h3>
+            <span class="text-muted">@_results.Count items</span>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th style="cursor: pointer;" @onclick='() => SortBy("name")'>
+                                Product @GetSortIndicator("name")
+                            </th>
+                            <th>Category</th>
+                            <th class="number" style="cursor: pointer;" @onclick='() => SortBy("starting")'>
+                                Starting @GetSortIndicator("starting")
+                            </th>
+                            <th class="number">Received</th>
+                            <th class="number" style="cursor: pointer;" @onclick='() => SortBy("current")'>
+                                Current @GetSortIndicator("current")
+                            </th>
+                            <th class="number">Sold</th>
+                            <th class="number">POS</th>
+                            <th class="number" style="cursor: pointer;" @onclick='() => SortBy("variance")'>
+                                Variance @GetSortIndicator("variance")
+                            </th>
+                            <th class="number">Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in _results)
+                        {
+                            <tr class="@GetRowClass(item)">
+                                <td>
+                                    <div class="item-name" style="font-size: 0.95rem;">@item.Product?.DisplayName</div>
+                                    <div class="text-muted" style="font-size: 0.8rem;">@item.Product?.SizeDescription</div>
+                                </td>
+                                <td>
+                                    <span class="item-badge @GetCategoryBadgeClass(item.Product?.Category)">
+                                        @GetCategoryName(item.Product?.Category)
+                                    </span>
+                                </td>
+                                <td class="number">@item.StartingQuantity.ToString("0.0")</td>
+                                <td class="number">@item.ReceivedQuantity.ToString("0.0")</td>
+                                <td class="number"><strong>@item.CurrentOnHand.ToString("0.0")</strong></td>
+                                <td class="number">@item.CalculatedSold.ToString("0.0")</td>
+                                <td class="number">@item.ComputerSold.ToString("0.0")</td>
+                                <td class='number @(item.Variance > 0.5m ? "text-danger" : item.Variance < -0.5m ? "text-success" : "")'>
+                                    @if (Math.Abs(item.Variance) > 0.1m)
+                                    {
+                                        @((item.Variance > 0 ? "+" : "") + item.Variance.ToString("0.0"))
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">—</span>
+                                    }
+                                </td>
+                                <td class="number">@((item.CurrentOnHand * item.UnitCost).ToString("C0"))</td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr style="background: var(--bg-tertiary); font-weight: 600;">
+                            <td colspan="4">Totals</td>
+                            <td class="number">@_results.Sum(i => i.CurrentOnHand).ToString("0.0")</td>
+                            <td class="number">@_results.Sum(i => i.CalculatedSold).ToString("0.0")</td>
+                            <td class="number">@_results.Sum(i => i.ComputerSold).ToString("0.0")</td>
+                            <td class='number @(_results.Sum(i => i.Variance) > 0 ? "text-danger" : "text-success")'>
+                                @_results.Sum(i => i.Variance).ToString("+0.0;-0.0;0")
+                            </td>
+                            <td class="number">@_results.Sum(i => i.CurrentOnHand * i.UnitCost).ToString("C0")</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+else if (_hasSearched)
+{
+    <div class="empty-state">
+        <div class="empty-state-icon">🔍</div>
+        <h2 class="empty-state-title">No Results</h2>
+        <p class="empty-state-text">Try adjusting your search or filters.</p>
+    </div>
+}
+else
+{
+    <div class="empty-state">
+        <div class="empty-state-icon">📋</div>
+        <h2 class="empty-state-title">Search Products</h2>
+        <p class="empty-state-text">Enter a search term or select a filter to view products.</p>
+    </div>
+}
+
+@* Product Detail Modal *@
+@if (_selectedItem != null)
+{
+    <div class="modal-backdrop" @onclick="CloseDetail">
+        <div class="modal" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h3 class="modal-title">@_selectedItem.Product?.DisplayName</h3>
+                <button class="modal-close" @onclick="CloseDetail">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex justify-between mb-md">
+                    <span class="text-muted">Category</span>
+                    <span class="item-badge @GetCategoryBadgeClass(_selectedItem.Product?.Category)">
+                        @GetCategoryName(_selectedItem.Product?.Category)
+                    </span>
+                </div>
+                <div class="d-flex justify-between mb-md">
+                    <span class="text-muted">Size</span>
+                    <span>@_selectedItem.Product?.SizeDescription</span>
+                </div>
+                <div class="d-flex justify-between mb-md">
+                    <span class="text-muted">Unit Cost</span>
+                    <span>@_selectedItem.UnitCost.ToString("C2")</span>
+                </div>
+                
+                <hr style="border-color: var(--border-primary); margin: 1rem 0;" />
+                
+                <h4 style="font-size: 1rem; margin-bottom: 0.75rem;">Counts by Area</h4>
+                @foreach (var area in _selectedItem.AreaCounts)
+                {
+                    <div class="d-flex justify-between mb-sm">
+                        <span>@area.AreaName</span>
+                        <span><strong>@area.TotalUnits.ToString("0.0")</strong></span>
+                    </div>
+                }
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" @onclick="CloseDetail">Close</button>
+                <a href="/capture" class="btn btn-primary">Edit Count</a>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [SupplyParameterFromQuery]
+    public string? Filter { get; set; }
+    
+    private InventorySession? _currentSession;
+    private List<InventoryItem> _allItems = new();
+    private List<InventoryItem> _results = new();
+    
+    private string _searchQuery = "";
+    private string _filterMode = "all";
+    private string _sortColumn = "name";
+    private bool _sortAscending = true;
+    private bool _hasSearched = false;
+    
+    private InventoryItem? _selectedItem;
+    
+    protected override void OnInitialized()
+    {
+        _currentSession = InventoryService.GetCurrentSession();
+        if (_currentSession != null)
+        {
+            _allItems = InventoryService.GetSessionItems(_currentSession.Id);
+        }
+        
+        // Handle URL filter parameter
+        if (!string.IsNullOrEmpty(Filter))
+        {
+            SetFilter(Filter);
+        }
+    }
+    
+    private void HandleSearch(KeyboardEventArgs e)
+    {
+        ApplyFilters();
+    }
+    
+    private void SetFilter(string filter)
+    {
+        _filterMode = filter;
+        _hasSearched = true;
+        ApplyFilters();
+    }
+    
+    private void ApplyFilters()
+    {
+        var filtered = _allItems.AsEnumerable();
+        
+        // Search query
+        if (!string.IsNullOrWhiteSpace(_searchQuery))
+        {
+            var query = _searchQuery.ToLower();
+            filtered = filtered.Where(i => 
+                i.Product?.DisplayName.ToLower().Contains(query) == true ||
+                i.Product?.Brand.ToLower().Contains(query) == true ||
+                i.Product?.Sku?.ToLower().Contains(query) == true);
+            _hasSearched = true;
+        }
+        
+        // Filter mode
+        filtered = _filterMode switch
+        {
+            "variance" => filtered.Where(i => Math.Abs(i.Variance) > 0.5m),
+            "uncounted" => filtered.Where(i => !i.LastCountedAt.HasValue),
+            "lowstock" => filtered.Where(i => i.CurrentOnHand < 2),
+            _ => filtered
+        };
+        
+        // Sort
+        filtered = _sortColumn switch
+        {
+            "name" => _sortAscending ? filtered.OrderBy(i => i.Product?.DisplayName) : filtered.OrderByDescending(i => i.Product?.DisplayName),
+            "starting" => _sortAscending ? filtered.OrderBy(i => i.StartingQuantity) : filtered.OrderByDescending(i => i.StartingQuantity),
+            "current" => _sortAscending ? filtered.OrderBy(i => i.CurrentOnHand) : filtered.OrderByDescending(i => i.CurrentOnHand),
+            "variance" => _sortAscending ? filtered.OrderBy(i => i.Variance) : filtered.OrderByDescending(i => i.Variance),
+            _ => filtered
+        };
+        
+        _results = filtered.ToList();
+    }
+    
+    private void SortBy(string column)
+    {
+        if (_sortColumn == column)
+            _sortAscending = !_sortAscending;
+        else
+        {
+            _sortColumn = column;
+            _sortAscending = true;
+        }
+        ApplyFilters();
+    }
+    
+    private string GetSortIndicator(string column)
+    {
+        if (_sortColumn != column) return "";
+        return _sortAscending ? " ↑" : " ↓";
+    }
+    
+    private void SelectItem(InventoryItem item)
+    {
+        _selectedItem = item;
+    }
+    
+    private void CloseDetail()
+    {
+        _selectedItem = null;
+    }
+    
+    private string GetRowClass(InventoryItem item)
+    {
+        if (item.Variance > 1) return "";
+        return "";
+    }
+    
+    private string GetCategoryName(ProductCategory? category) => category switch
+    {
+        ProductCategory.Liquor => "Liquor",
+        ProductCategory.Wine => "Wine",
+        ProductCategory.BeerBottle => "Bottle",
+        ProductCategory.BeerCan => "Can",
+        ProductCategory.Seltzer => "Seltzer",
+        ProductCategory.DraftBeer => "Draft",
+        ProductCategory.Mixers => "Mixer",
+        _ => "Other"
+    };
+    
+    private string GetCategoryBadgeClass(ProductCategory? category) => category switch
+    {
+        ProductCategory.Liquor => "badge-liquor",
+        ProductCategory.Wine => "badge-wine",
+        ProductCategory.BeerBottle => "badge-beer-bottle",
+        ProductCategory.BeerCan => "badge-beer-can",
+        ProductCategory.Seltzer => "badge-seltzer",
+        ProductCategory.DraftBeer => "badge-draft",
+        _ => ""
+    };
+}

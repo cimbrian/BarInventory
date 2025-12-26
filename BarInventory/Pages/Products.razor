@@ -1,0 +1,346 @@
+@page "/products"
+@inject InventoryService InventoryService
+
+<PageTitle>Products - Bar Inventory</PageTitle>
+
+<div class="page-header d-flex justify-between align-center" style="flex-wrap: wrap; gap: 1rem;">
+    <div>
+        <h1 class="page-title">Product Catalog</h1>
+        <p class="page-subtitle">@_products.Count products in @_categories.Count categories</p>
+    </div>
+    <button class="btn btn-primary" @onclick="OpenAddProduct">
+        ➕ Add Product
+    </button>
+</div>
+
+@* Category Filter *@
+<div class="category-pills mb-md">
+    <button class='category-pill @(_selectedCategory == null ? "active" : "")' @onclick="() => _selectedCategory = null">
+        All (@_products.Count)
+    </button>
+    @foreach (var category in _categories)
+    {
+        var count = _products.Count(p => p.Category == category);
+        <button class='category-pill @(_selectedCategory == category ? "active" : "")' 
+                @onclick="() => _selectedCategory = category">
+            @GetCategoryIcon(category) @GetCategoryName(category) (@count)
+        </button>
+    }
+</div>
+
+@* Search *@
+<div class="search-wrapper mb-md">
+    <span class="search-icon">🔍</span>
+    <input type="text" 
+           class="form-control" 
+           placeholder="Search products..." 
+           @bind="_searchQuery" 
+           @bind:event="oninput" />
+</div>
+
+@* Products Table *@
+<div class="card">
+    <div class="card-body" style="padding: 0;">
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;"></th>
+                        <th>Product</th>
+                        <th>Category</th>
+                        <th>Size</th>
+                        <th class="number">Cost</th>
+                        <th class="number">Price</th>
+                        <th class="number">Servings</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var product in GetFilteredProducts())
+                    {
+                        <tr>
+                            <td>
+                                <button class="btn btn-ghost btn-sm" @onclick="() => EditProduct(product)">✏️</button>
+                            </td>
+                            <td>
+                                <div style="font-weight: 500;">@product.DisplayName</div>
+                                @if (!string.IsNullOrEmpty(product.Barcode))
+                                {
+                                    <div class="text-muted" style="font-size: 0.8rem;">@product.Barcode</div>
+                                }
+                            </td>
+                            <td>
+                                <span class="item-badge @GetCategoryBadgeClass(product.Category)">
+                                    @GetCategoryName(product.Category)
+                                </span>
+                            </td>
+                            <td>@product.SizeDescription</td>
+                            <td class="number">@product.UnitCost.ToString("C2")</td>
+                            <td class="number">@product.UnitPrice.ToString("C2")</td>
+                            <td class="number">
+                                @if (product.ServingsPerUnit.HasValue)
+                                {
+                                    @product.ServingsPerUnit.Value.ToString("0")
+                                }
+                                else
+                                {
+                                    <span class="text-muted">1</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@if (!GetFilteredProducts().Any())
+{
+    <div class="empty-state mt-lg">
+        <div class="empty-state-icon">📦</div>
+        <h2 class="empty-state-title">No Products Found</h2>
+        <p class="empty-state-text">Try adjusting your search or filters.</p>
+    </div>
+}
+
+@* Add/Edit Product Modal *@
+@if (_showProductModal)
+{
+    <div class="modal-backdrop" @onclick="CloseModal">
+        <div class="modal" @onclick:stopPropagation="true" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 class="modal-title">@(_editingProduct == null ? "Add Product" : "Edit Product")</h3>
+                <button class="modal-close" @onclick="CloseModal">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex gap-md" style="flex-wrap: wrap;">
+                    <div class="form-group" style="flex: 1; min-width: 200px;">
+                        <label class="form-label">Brand</label>
+                        <input type="text" class="form-control" @bind="_editProduct.Brand" placeholder="e.g., Tito's" />
+                    </div>
+                    <div class="form-group" style="flex: 1; min-width: 200px;">
+                        <label class="form-label">Name</label>
+                        <input type="text" class="form-control" @bind="_editProduct.Name" placeholder="e.g., Vodka" />
+                    </div>
+                </div>
+                
+                <div class="d-flex gap-md" style="flex-wrap: wrap;">
+                    <div class="form-group" style="flex: 1; min-width: 150px;">
+                        <label class="form-label">Category</label>
+                        <select class="form-control" @bind="_editProduct.Category">
+                            @foreach (var category in Enum.GetValues<ProductCategory>())
+                            {
+                                <option value="@category">@GetCategoryName(category)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="form-group" style="flex: 1; min-width: 150px;">
+                        <label class="form-label">Container Type</label>
+                        <select class="form-control" @bind="_editProduct.ContainerType">
+                            @foreach (var container in Enum.GetValues<ContainerType>())
+                            {
+                                <option value="@container">@GetContainerName(container)</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Size Description</label>
+                    <input type="text" class="form-control" @bind="_editProduct.SizeDescription" placeholder="e.g., 750ml, 12oz can" />
+                </div>
+                
+                <div class="d-flex gap-md" style="flex-wrap: wrap;">
+                    <div class="form-group" style="flex: 1; min-width: 120px;">
+                        <label class="form-label">Unit Cost</label>
+                        <input type="number" class="form-control" @bind="_editProduct.UnitCost" step="0.01" min="0" />
+                    </div>
+                    <div class="form-group" style="flex: 1; min-width: 120px;">
+                        <label class="form-label">Unit Price</label>
+                        <input type="number" class="form-control" @bind="_editProduct.UnitPrice" step="0.01" min="0" />
+                    </div>
+                    <div class="form-group" style="flex: 1; min-width: 120px;">
+                        <label class="form-label">Servings/Unit</label>
+                        <input type="number" class="form-control" @bind="_editProduct.ServingsPerUnit" step="1" min="1" placeholder="Optional" />
+                    </div>
+                </div>
+                
+                <div class="d-flex gap-md" style="flex-wrap: wrap;">
+                    <div class="form-group" style="flex: 1;">
+                        <label class="form-label">Barcode (Optional)</label>
+                        <input type="text" class="form-control" @bind="_editProduct.Barcode" placeholder="UPC/EAN" />
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label class="form-label">SKU (Optional)</label>
+                        <input type="text" class="form-control" @bind="_editProduct.Sku" placeholder="Internal SKU" />
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" @onclick="CloseModal">Cancel</button>
+                <button class="btn btn-primary" @onclick="SaveProduct">
+                    @(_editingProduct == null ? "Add Product" : "Save Changes")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Product> _products = new();
+    private List<ProductCategory> _categories = new();
+    
+    private ProductCategory? _selectedCategory;
+    private string _searchQuery = "";
+    
+    private bool _showProductModal = false;
+    private Product? _editingProduct;
+    private Product _editProduct = new();
+    
+    protected override void OnInitialized()
+    {
+        LoadProducts();
+    }
+    
+    private void LoadProducts()
+    {
+        _products = InventoryService.GetAllProducts();
+        _categories = _products.Select(p => p.Category).Distinct().OrderBy(c => c).ToList();
+    }
+    
+    private List<Product> GetFilteredProducts()
+    {
+        var filtered = _products.AsEnumerable();
+        
+        if (_selectedCategory.HasValue)
+            filtered = filtered.Where(p => p.Category == _selectedCategory.Value);
+        
+        if (!string.IsNullOrWhiteSpace(_searchQuery))
+        {
+            var query = _searchQuery.ToLower();
+            filtered = filtered.Where(p => 
+                p.DisplayName.ToLower().Contains(query) ||
+                p.Brand.ToLower().Contains(query) ||
+                p.Barcode?.ToLower().Contains(query) == true);
+        }
+        
+        return filtered.OrderBy(p => p.Category).ThenBy(p => p.DisplayName).ToList();
+    }
+    
+    private void OpenAddProduct()
+    {
+        _editingProduct = null;
+        _editProduct = new Product
+        {
+            Category = ProductCategory.Liquor,
+            ContainerType = ContainerType.Bottle750ml,
+            SizeDescription = "750ml",
+            IsActive = true
+        };
+        _showProductModal = true;
+    }
+    
+    private void EditProduct(Product product)
+    {
+        _editingProduct = product;
+        _editProduct = new Product
+        {
+            Id = product.Id,
+            Brand = product.Brand,
+            Name = product.Name,
+            Category = product.Category,
+            ContainerType = product.ContainerType,
+            SizeDescription = product.SizeDescription,
+            UnitCost = product.UnitCost,
+            UnitPrice = product.UnitPrice,
+            ServingsPerUnit = product.ServingsPerUnit,
+            Barcode = product.Barcode,
+            Sku = product.Sku,
+            IsActive = product.IsActive
+        };
+        _showProductModal = true;
+    }
+    
+    private void CloseModal()
+    {
+        _showProductModal = false;
+        _editingProduct = null;
+    }
+    
+    private void SaveProduct()
+    {
+        if (string.IsNullOrWhiteSpace(_editProduct.Brand) && string.IsNullOrWhiteSpace(_editProduct.Name))
+            return;
+        
+        _editProduct.IsActive = true;
+        
+        if (_editingProduct == null)
+        {
+            InventoryService.AddProduct(_editProduct);
+        }
+        else
+        {
+            InventoryService.UpdateProduct(_editProduct);
+        }
+        
+        LoadProducts();
+        CloseModal();
+    }
+    
+    private string GetCategoryIcon(ProductCategory category) => category switch
+    {
+        ProductCategory.Liquor => "🥃",
+        ProductCategory.Wine => "🍷",
+        ProductCategory.BeerBottle => "🍺",
+        ProductCategory.BeerCan => "🥫",
+        ProductCategory.Seltzer => "✨",
+        ProductCategory.DraftBeer => "🍻",
+        ProductCategory.Mixers => "🧃",
+        _ => "📦"
+    };
+    
+    private string GetCategoryName(ProductCategory category) => category switch
+    {
+        ProductCategory.Liquor => "Liquor",
+        ProductCategory.Wine => "Wine",
+        ProductCategory.BeerBottle => "Beer (Bottles)",
+        ProductCategory.BeerCan => "Beer (Cans)",
+        ProductCategory.Seltzer => "Seltzers",
+        ProductCategory.DraftBeer => "Draft Beer",
+        ProductCategory.Mixers => "Mixers",
+        ProductCategory.Other => "Other",
+        _ => category.ToString()
+    };
+    
+    private string GetCategoryBadgeClass(ProductCategory category) => category switch
+    {
+        ProductCategory.Liquor => "badge-liquor",
+        ProductCategory.Wine => "badge-wine",
+        ProductCategory.BeerBottle => "badge-beer-bottle",
+        ProductCategory.BeerCan => "badge-beer-can",
+        ProductCategory.Seltzer => "badge-seltzer",
+        ProductCategory.DraftBeer => "badge-draft",
+        _ => ""
+    };
+    
+    private string GetContainerName(ContainerType container) => container switch
+    {
+        ContainerType.Bottle750ml => "750ml Bottle",
+        ContainerType.Bottle1L => "1L Bottle",
+        ContainerType.Bottle1_75L => "1.75L Bottle",
+        ContainerType.Bottle375ml => "375ml Bottle",
+        ContainerType.Can12oz => "12oz Can",
+        ContainerType.Can16oz => "16oz Can",
+        ContainerType.Can19_2oz => "19.2oz Can",
+        ContainerType.Bottle12oz => "12oz Bottle",
+        ContainerType.Bottle22oz => "22oz Bottle",
+        ContainerType.KegHalfBarrel => "1/2 Barrel Keg",
+        ContainerType.KegQuarterBarrel => "1/4 Barrel Keg",
+        ContainerType.KegSixtel => "1/6 Barrel (Sixtel)",
+        ContainerType.WineBottle750ml => "750ml Wine Bottle",
+        ContainerType.WineBottle1_5L => "1.5L Wine Bottle",
+        ContainerType.BoxWine3L => "3L Box Wine",
+        ContainerType.Other => "Other",
+        _ => container.ToString()
+    };
+}

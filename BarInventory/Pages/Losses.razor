@@ -1,0 +1,317 @@
+@page "/losses"
+@inject InventoryService InventoryService
+
+<PageTitle>Loss Tracking - Bar Inventory</PageTitle>
+
+<div class="page-header">
+    <h1 class="page-title">Loss Tracking</h1>
+    <p class="page-subtitle">Record breakage, spillage, comps, and returns</p>
+</div>
+
+@if (_currentSession == null)
+{
+    <div class="alert alert-info mb-lg">
+        <strong>📋 No active inventory session.</strong> A session will be auto-created when you record a loss.
+    </div>
+}
+
+@* Summary Stats *@
+<div class="stats-grid mb-lg">
+    <StatCard Label="Total Losses" Value="@_totalLossValue.ToString("C0")" ValueClass="@(_totalLossValue > 0 ? "warning" : "")" />
+    <StatCard Label="Breakage" Value="@GetLossTypeValue(LossType.Breakage).ToString("C0")" />
+    <StatCard Label="Comps" Value="@((GetLossTypeValue(LossType.Comp) + GetLossTypeValue(LossType.ManagerComp)).ToString("C0"))" />
+    <StatCard Label="Returns" Value="@GetLossTypeValue(LossType.CustomerReturn).ToString("C0")" />
+</div>
+
+@* Add New Loss *@
+<div class="card mb-lg">
+    <div class="card-header">
+        <h3 class="card-title">➕ Record a Loss</h3>
+    </div>
+    <div class="card-body">
+        @* Loss Type Selection *@
+        <div class="form-group">
+            <label class="form-label">Loss Type</label>
+            <div class="loss-type-grid">
+                @foreach (var lossType in Enum.GetValues<LossType>())
+                {
+                    <button type="button" 
+                            class='loss-type-btn @(_newLoss.LossType == lossType ? "selected" : "")'
+                            @onclick="() => _newLoss.LossType = lossType">
+                        <span class="loss-type-icon">@GetLossTypeIcon(lossType)</span>
+                        @GetLossTypeName(lossType)
+                        </button>
+                    }
+                </div>
+            </div>
+            
+            @* Product Selection *@
+            <div class="form-group">
+                <label class="form-label">Product</label>
+                <div class="search-wrapper">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" 
+                           class="form-control" 
+                           placeholder="Search products..."
+                           @bind="_productSearch"
+                           @bind:event="oninput"
+                           @onfocus="() => _showProductDropdown = true" />
+                </div>
+                
+                @if (_showProductDropdown && GetFilteredProducts().Any())
+                {
+                    <div style="background: var(--bg-tertiary); border: 1px solid var(--border-primary); border-radius: var(--radius-md); margin-top: 0.25rem; max-height: 200px; overflow-y: auto;">
+                        @foreach (var product in GetFilteredProducts().Take(10))
+                        {
+                            <div style="padding: 0.75rem; cursor: pointer; border-bottom: 1px solid var(--border-primary);"
+                                 class='@(_newLoss.ProductId == product.Id ? "bg-active" : "")'
+                                 @onclick="() => SelectProduct(product)">
+                                <div style="font-weight: 500;">@product.DisplayName</div>
+                                <div class="text-muted" style="font-size: 0.85rem;">@product.SizeDescription • $@product.UnitCost.ToString("0.00")</div>
+                            </div>
+                        }
+                    </div>
+                }
+                
+                @if (_selectedProduct != null)
+                {
+                    <div class="alert alert-info mt-sm" style="padding: 0.75rem;">
+                        <strong>@_selectedProduct.DisplayName</strong>
+                        <span class="text-muted"> - @_selectedProduct.SizeDescription</span>
+                    </div>
+                }
+            </div>
+            
+            @* Quantity and Reason *@
+            <div class="d-flex gap-md" style="flex-wrap: wrap;">
+                <div class="form-group" style="flex: 1; min-width: 150px;">
+                    <label class="form-label">Quantity</label>
+                    <input type="number" 
+                           class="form-control" 
+                           min="0.1" 
+                           step="0.1"
+                           @bind="_newLoss.Quantity" />
+                </div>
+                
+                <div class="form-group" style="flex: 2; min-width: 200px;">
+                    <label class="form-label">Reason / Notes</label>
+                    <input type="text" 
+                           class="form-control" 
+                           placeholder="What happened?"
+                           @bind="_newLoss.Reason" />
+                </div>
+            </div>
+            
+            @* Estimated Value *@
+            @if (_selectedProduct != null && _newLoss.Quantity > 0)
+            {
+                <div class="alert alert-warning mb-md">
+                    Estimated Loss Value: <strong>@((_newLoss.Quantity * _selectedProduct.UnitCost).ToString("C2"))</strong>
+                </div>
+            }
+            
+            <button class="btn btn-danger btn-lg btn-block" 
+                    @onclick="AddLoss"
+                    disabled="@(_selectedProduct == null || _newLoss.Quantity <= 0)">
+                📉 Record Loss
+            </button>
+        </div>
+    </div>
+    
+    @* Loss History *@
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Loss History</h3>
+            <span class="text-muted">@_losses.Count records</span>
+        </div>
+        
+        @if (_losses.Any())
+        {
+            <div class="card-body" style="padding: 0;">
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px;"></th>
+                                <th>Time</th>
+                                <th>Type</th>
+                                <th>Product</th>
+                                <th class="number">Qty</th>
+                                <th class="number">Value</th>
+                                <th>Reason</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var loss in _losses)
+                            {
+                                <tr>
+                                    <td>
+                                        <button class="btn btn-ghost btn-sm" @onclick="() => DeleteLoss(loss.Id)" title="Delete">
+                                            🗑️
+                                        </button>
+                                    </td>
+                                    <td style="white-space: nowrap;">@loss.RecordedAt.ToString("M/d h:mm tt")</td>
+                                    <td>
+                                        <span title="@GetLossTypeName(loss.LossType)">@GetLossTypeIcon(loss.LossType)</span>
+                                        @GetLossTypeName(loss.LossType)
+                                    </td>
+                                    <td>@loss.Product?.DisplayName</td>
+                                    <td class="number">@loss.Quantity.ToString("0.0")</td>
+                                    <td class="number text-danger">@loss.EstimatedValue.ToString("C2")</td>
+                                    <td class="text-muted">@(loss.Reason ?? "—")</td>
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot>
+                            <tr style="background: var(--bg-tertiary); font-weight: 600;">
+                                <td></td>
+                                <td colspan="3">Total</td>
+                                <td class="number">@_losses.Sum(l => l.Quantity).ToString("0.0")</td>
+                                <td class="number text-danger">@_losses.Sum(l => l.EstimatedValue).ToString("C2")</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="card-body">
+                <div class="empty-state">
+                    <div class="empty-state-icon">✨</div>
+                    <h2 class="empty-state-title">No Losses Recorded</h2>
+                    <p class="empty-state-text">Great job! No breakage, spillage, or comps recorded yet.</p>
+                </div>
+            </div>
+        }
+    </div>
+
+@code {
+    private InventorySession? _currentSession;
+    private List<Product> _products = new();
+    private List<LossRecord> _losses = new();
+    private Dictionary<LossType, decimal> _lossByType = new();
+    
+    private LossRecord _newLoss = new() { Quantity = 1 };
+    private Product? _selectedProduct;
+    private string _productSearch = "";
+    private bool _showProductDropdown = false;
+    private decimal _totalLossValue = 0;
+    
+    protected override void OnInitialized()
+    {
+        _currentSession = InventoryService.GetCurrentSession();
+        _products = InventoryService.GetAllProducts();
+        
+        if (_currentSession != null)
+        {
+            LoadLosses();
+        }
+    }
+    
+    private void LoadLosses()
+    {
+        if (_currentSession == null) return;
+        
+        _losses = InventoryService.GetSessionLosses(_currentSession.Id);
+        _lossByType = InventoryService.GetLossByType(_currentSession.Id);
+        _totalLossValue = InventoryService.GetTotalLossValue(_currentSession.Id);
+    }
+    
+    private List<Product> GetFilteredProducts()
+    {
+        if (string.IsNullOrWhiteSpace(_productSearch))
+            return _products.Take(10).ToList();
+        
+        var query = _productSearch.ToLower();
+        return _products
+            .Where(p => p.DisplayName.ToLower().Contains(query) || p.Brand.ToLower().Contains(query))
+            .Take(10)
+            .ToList();
+    }
+    
+    private void SelectProduct(Product product)
+    {
+        _selectedProduct = product;
+        _newLoss.ProductId = product.Id;
+        _productSearch = product.DisplayName;
+        _showProductDropdown = false;
+    }
+    
+    private void AddLoss()
+    {
+        if (_selectedProduct == null || _newLoss.Quantity <= 0)
+            return;
+        
+        // Auto-create session if none exists
+        if (_currentSession == null)
+        {
+            var newSession = new InventorySession
+            {
+                SessionName = $"Week {DateTime.Now.DayOfYear / 7 + 1} - {DateTime.Now:MMMM yyyy}",
+                SessionDate = DateTime.Now,
+                Frequency = InventoryFrequency.Weekly,
+                CountedBy = "Auto-created"
+            };
+            _currentSession = InventoryService.CreateSession(newSession, false);
+        }
+        
+        _newLoss.SessionId = _currentSession.Id;
+        _newLoss.OccurredAt = DateTime.Now;
+        
+        InventoryService.AddLoss(_newLoss);
+        
+        // Reset form
+        _newLoss = new LossRecord { Quantity = 1 };
+        _selectedProduct = null;
+        _productSearch = "";
+        
+        LoadLosses();
+    }
+    
+    private void DeleteLoss(int id)
+    {
+        InventoryService.DeleteLoss(id);
+        LoadLosses();
+    }
+    
+    private decimal GetLossTypeValue(LossType type)
+    {
+        return _lossByType.GetValueOrDefault(type, 0);
+    }
+    
+    private string GetLossTypeIcon(LossType type) => type switch
+    {
+        LossType.Breakage => "💔",
+        LossType.Spoilage => "🗑️",
+        LossType.Spillage => "💧",
+        LossType.Comp => "🎁",
+        LossType.ManagerComp => "👔",
+        LossType.CustomerReturn => "↩️",
+        LossType.MixingError => "❌",
+        LossType.Overpouring => "🍸",
+        LossType.Theft => "🚨",
+        LossType.Training => "📚",
+        LossType.Sampling => "🥂",
+        LossType.Other => "📋",
+        _ => "❓"
+    };
+    
+    private string GetLossTypeName(LossType type) => type switch
+    {
+        LossType.Breakage => "Breakage",
+        LossType.Spoilage => "Spoilage",
+        LossType.Spillage => "Spillage",
+        LossType.Comp => "Comp",
+        LossType.ManagerComp => "Mgr Comp",
+        LossType.CustomerReturn => "Return",
+        LossType.MixingError => "Mix Error",
+        LossType.Overpouring => "Overpour",
+        LossType.Theft => "Theft",
+        LossType.Training => "Training",
+        LossType.Sampling => "Sample",
+        LossType.Other => "Other",
+        _ => type.ToString()
+    };
+}

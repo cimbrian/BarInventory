@@ -1,0 +1,546 @@
+@page "/sessions"
+@inject InventoryService InventoryService
+
+<PageTitle>Sessions - Bar Inventory</PageTitle>
+
+<div class="page-header">
+    <div class="d-flex justify-between align-center">
+        <div>
+            <h1 class="page-title">Inventory Sessions</h1>
+            <p class="page-subtitle">Create and manage inventory counting periods</p>
+        </div>
+        <button class="btn btn-primary" @onclick="ShowNewSessionModal">
+            + New Session
+        </button>
+    </div>
+</div>
+
+@* Active Session Card *@
+@if (_activeSession != null)
+{
+    <div class="card card-highlight mb-lg">
+        <div class="card-header">
+            <h2 class="card-title">
+                <span class="status-dot status-active"></span>
+                Active Session
+            </h2>
+            <span class="badge badge-success">In Progress</span>
+        </div>
+        <div class="card-body">
+            <div class="session-info-grid">
+                <div class="session-info-item">
+                    <span class="session-info-label">Session Name</span>
+                    <span class="session-info-value">@_activeSession.SessionName</span>
+                </div>
+                <div class="session-info-item">
+                    <span class="session-info-label">Started</span>
+                    <span class="session-info-value">@_activeSession.SessionDate.ToString("MMM d, yyyy h:mm tt")</span>
+                </div>
+                <div class="session-info-item">
+                    <span class="session-info-label">Frequency</span>
+                    <span class="session-info-value">@_activeSession.Frequency</span>
+                </div>
+                <div class="session-info-item">
+                    <span class="session-info-label">Counted By</span>
+                    <span class="session-info-value">@(string.IsNullOrEmpty(_activeSession.CountedBy) ? "Not specified" : _activeSession.CountedBy)</span>
+                </div>
+            </div>
+            
+            @* Progress *@
+            <div class="mt-md">
+                <div class="d-flex justify-between mb-xs">
+                    <span class="text-secondary">Inventory Progress</span>
+                    <span class="text-primary">@_countedItems / @_totalItems products</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: @((_totalItems > 0 ? (_countedItems / (decimal)_totalItems) * 100 : 0))%"></div>
+                </div>
+            </div>
+            
+            <div class="d-flex gap-sm mt-md" style="flex-wrap: wrap;">
+                <a href="/capture" class="btn btn-primary">
+                    📝 Continue Counting
+                </a>
+                <button class="btn btn-secondary" @onclick="ShowCompleteConfirm">
+                    ✓ Complete Session
+                </button>
+                <button class="btn btn-outline" @onclick="() => ShowEditSession(_activeSession)">
+                    ✎ Edit
+                </button>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="card mb-lg">
+        <div class="card-body">
+            <div class="empty-state">
+                <div class="empty-state-icon">📋</div>
+                <h2 class="empty-state-title">No Active Session</h2>
+                <p class="empty-state-text">Start a new inventory session to begin counting products.</p>
+                <button class="btn btn-primary btn-lg" @onclick="ShowNewSessionModal">
+                    + Start New Session
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@* Session History *@
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Session History</h2>
+        <span class="text-secondary">@_completedSessions.Count completed sessions</span>
+    </div>
+    <div class="card-body">
+        @if (_completedSessions.Count == 0)
+        {
+            <div class="empty-state">
+                <div class="empty-state-icon">📜</div>
+                <p class="empty-state-text">No completed sessions yet.</p>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 80px;">Actions</th>
+                            <th>Session</th>
+                            <th>Date</th>
+                            <th>Completed</th>
+                            <th>Frequency</th>
+                            <th>Products</th>
+                            <th>Variance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var session in _completedSessions)
+                        {
+                            var summary = InventoryService.GetSessionSummary(session.Id);
+                            <tr>
+                                <td>
+                                    <div class="d-flex gap-xs">
+                                        <button class="btn btn-sm btn-outline" @onclick="() => ViewSession(session.Id)" title="View Details">
+                                            👁
+                                        </button>
+                                        <button class="btn btn-sm btn-outline" @onclick="() => ShowDeleteConfirm(session)" title="Delete">
+                                            🗑
+                                        </button>
+                                    </div>
+                                </td>
+                                <td>
+                                    <strong>@session.SessionName</strong>
+                                    @if (!string.IsNullOrEmpty(session.CountedBy))
+                                    {
+                                        <br/><span class="text-muted text-sm">by @session.CountedBy</span>
+                                    }
+                                </td>
+                                <td>@session.SessionDate.ToString("MMM d, yyyy")</td>
+                                <td>@session.CompletedAt?.ToString("MMM d, h:mm tt")</td>
+                                <td>
+                                    <span class="badge badge-secondary">@session.Frequency</span>
+                                </td>
+                                <td>@summary.ProductsCounted / @summary.TotalProducts</td>
+                                <td>
+                                    @if (summary.TotalVarianceValue != 0)
+                                    {
+                                        <span class='@(summary.TotalVarianceValue > 0 ? "text-danger" : "text-success")'>
+                                            @(summary.TotalVarianceValue > 0 ? "+" : "")$@summary.TotalVarianceValue.ToString("0.00")
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">$0.00</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@* New/Edit Session Modal *@
+@if (_showSessionModal)
+{
+    <div class="modal-backdrop" @onclick="CloseModals"></div>
+    <div class="modal">
+        <div class="modal-header">
+            <h2 class="modal-title">@(_editingSession == null ? "New Inventory Session" : "Edit Session")</h2>
+            <button class="modal-close" @onclick="CloseModals">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Session Name</label>
+                <input type="text" class="form-control" @bind="_sessionForm.SessionName" 
+                       placeholder="e.g., Week 1 - January 2024" />
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Session Date</label>
+                <input type="datetime-local" class="form-control" @bind="_sessionForm.SessionDate" />
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Frequency</label>
+                <select class="form-control" @bind="_sessionForm.Frequency">
+                    @foreach (var freq in Enum.GetValues<InventoryFrequency>())
+                    {
+                        <option value="@freq">@freq</option>
+                    }
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Counted By</label>
+                <input type="text" class="form-control" @bind="_sessionForm.CountedBy" 
+                       placeholder="Staff member name" />
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Notes (optional)</label>
+                <textarea class="form-control" rows="3" @bind="_sessionForm.Notes" 
+                          placeholder="Any notes about this inventory session..."></textarea>
+            </div>
+            
+            @if (_editingSession == null)
+            {
+                <div class="form-group">
+                    <label class="form-label">
+                        <input type="checkbox" @bind="_copyPreviousData" />
+                        Copy starting quantities from previous session
+                    </label>
+                </div>
+            }
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" @onclick="CloseModals">Cancel</button>
+            <button class="btn btn-primary" @onclick="SaveSession">
+                @(_editingSession == null ? "Create Session" : "Save Changes")
+            </button>
+        </div>
+    </div>
+}
+
+@* Complete Confirmation Modal *@
+@if (_showCompleteConfirm)
+{
+    <div class="modal-backdrop" @onclick="CloseModals"></div>
+    <div class="modal">
+        <div class="modal-header">
+            <h2 class="modal-title">Complete Session?</h2>
+            <button class="modal-close" @onclick="CloseModals">×</button>
+        </div>
+        <div class="modal-body">
+            <p>Are you sure you want to complete this inventory session?</p>
+            <p class="text-warning mt-sm">
+                ⚠️ Once completed, the session cannot be edited. Make sure all counts are finalized.
+            </p>
+            @if (_countedItems < _totalItems)
+            {
+                <div class="alert alert-warning mt-md">
+                    <strong>Warning:</strong> Only @_countedItems of @_totalItems products have been counted.
+                </div>
+            }
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" @onclick="CloseModals">Cancel</button>
+            <button class="btn btn-success" @onclick="CompleteSession">
+                ✓ Complete Session
+            </button>
+        </div>
+    </div>
+}
+
+@* Delete Confirmation Modal *@
+@if (_showDeleteConfirm && _sessionToDelete != null)
+{
+    <div class="modal-backdrop" @onclick="CloseModals"></div>
+    <div class="modal">
+        <div class="modal-header">
+            <h2 class="modal-title">Delete Session?</h2>
+            <button class="modal-close" @onclick="CloseModals">×</button>
+        </div>
+        <div class="modal-body">
+            <p>Are you sure you want to delete <strong>@_sessionToDelete.SessionName</strong>?</p>
+            <p class="text-danger mt-sm">
+                ⚠️ This action cannot be undone. All inventory data for this session will be permanently deleted.
+            </p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" @onclick="CloseModals">Cancel</button>
+            <button class="btn btn-danger" @onclick="DeleteSession">
+                🗑 Delete Session
+            </button>
+        </div>
+    </div>
+}
+
+@* View Session Details Modal *@
+@if (_showViewModal && _viewingSession != null)
+{
+    <div class="modal-backdrop" @onclick="CloseModals"></div>
+    <div class="modal" style="max-width: 700px;">
+        <div class="modal-header">
+            <h2 class="modal-title">📊 @_viewingSession.SessionName</h2>
+            <button class="modal-close" @onclick="CloseModals">×</button>
+        </div>
+        <div class="modal-body">
+            @* Session Info *@
+            <div class="session-info-grid mb-md">
+                <div class="session-info-item">
+                    <span class="session-info-label">Date</span>
+                    <span class="session-info-value">@_viewingSession.SessionDate.ToString("MMM d, yyyy")</span>
+                </div>
+                <div class="session-info-item">
+                    <span class="session-info-label">Completed</span>
+                    <span class="session-info-value">@_viewingSession.CompletedAt?.ToString("MMM d, h:mm tt")</span>
+                </div>
+                <div class="session-info-item">
+                    <span class="session-info-label">Counted By</span>
+                    <span class="session-info-value">@(string.IsNullOrEmpty(_viewingSession.CountedBy) ? "—" : _viewingSession.CountedBy)</span>
+                </div>
+                <div class="session-info-item">
+                    <span class="session-info-label">Frequency</span>
+                    <span class="session-info-value">@_viewingSession.Frequency</span>
+                </div>
+            </div>
+            
+            @* Summary Stats *@
+            <div class="stat-grid mb-md">
+                <div class="stat-card">
+                    <span class="stat-label">Products Counted</span>
+                    <span class="stat-value">@_viewSummary.ProductsCounted / @_viewSummary.TotalProducts</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Inventory Value</span>
+                    <span class="stat-value">@_viewSummary.TotalInventoryValue.ToString("C0")</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Total Variance</span>
+                    <span class='stat-value @(_viewSummary.TotalVarianceValue > 0 ? "text-danger" : _viewSummary.TotalVarianceValue < 0 ? "text-success" : "")'>
+                        @(_viewSummary.TotalVarianceValue > 0 ? "+" : "")@_viewSummary.TotalVarianceValue.ToString("C2")
+                    </span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Losses Recorded</span>
+                    <span class="stat-value text-warning">@_viewSummary.TotalLossValue.ToString("C2")</span>
+                </div>
+            </div>
+            
+            @* Variance Alerts *@
+            @if (_viewSummary.Alerts.Any())
+            {
+                <h4 class="mb-sm">⚠️ Variance Alerts (@_viewSummary.Alerts.Count)</h4>
+                <div style="max-height: 200px; overflow-y: auto; background: var(--bg-tertiary); border-radius: var(--radius-md); padding: var(--spacing-sm);">
+                    @foreach (var alert in _viewSummary.Alerts.Take(10))
+                    {
+                        <div class="d-flex justify-between align-center" style="padding: var(--spacing-xs) 0; border-bottom: 1px solid var(--border-primary);">
+                            <span>@alert.Product?.DisplayName</span>
+                            <span class='@(alert.VarianceAmount > 0 ? "text-danger" : "text-success")'>
+                                @(alert.VarianceAmount > 0 ? "+" : "")@alert.VarianceAmount.ToString("0.0") units
+                            </span>
+                        </div>
+                    }
+                    @if (_viewSummary.Alerts.Count > 10)
+                    {
+                        <div class="text-muted text-center mt-sm">
+                            + @(_viewSummary.Alerts.Count - 10) more...
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="text-success">✓ No significant variances</div>
+            }
+            
+            @if (!string.IsNullOrEmpty(_viewingSession.Notes))
+            {
+                <h4 class="mt-md mb-sm">📝 Notes</h4>
+                <p class="text-secondary">@_viewingSession.Notes</p>
+            }
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" @onclick="CloseModals">Close</button>
+            <a href="/lookup" class="btn btn-primary">View Full Details</a>
+        </div>
+    </div>
+}
+
+@code {
+    private InventorySession? _activeSession;
+    private List<InventorySession> _completedSessions = new();
+    private int _countedItems;
+    private int _totalItems;
+    
+    // Modal state
+    private bool _showSessionModal;
+    private bool _showCompleteConfirm;
+    private bool _showDeleteConfirm;
+    private bool _showViewModal;
+    private InventorySession? _editingSession;
+    private InventorySession? _sessionToDelete;
+    private InventorySession? _viewingSession;
+    private InventorySummary _viewSummary = new();
+    private bool _copyPreviousData = true;
+    
+    // Form
+    private SessionFormModel _sessionForm = new();
+    
+    protected override void OnInitialized()
+    {
+        LoadData();
+    }
+    
+    private void LoadData()
+    {
+        _activeSession = InventoryService.GetCurrentSession();
+        _completedSessions = InventoryService.GetAllSessions()
+            .Where(s => s.IsComplete)
+            .ToList();
+        
+        if (_activeSession != null)
+        {
+            var items = InventoryService.GetSessionItems(_activeSession.Id);
+            _totalItems = items.Count;
+            _countedItems = items.Count(i => i.LastCountedAt.HasValue);
+        }
+    }
+    
+    private void ShowNewSessionModal()
+    {
+        _editingSession = null;
+        _sessionForm = new SessionFormModel
+        {
+            SessionName = GenerateSessionName(),
+            SessionDate = DateTime.Now,
+            Frequency = InventoryFrequency.Weekly
+        };
+        _showSessionModal = true;
+    }
+    
+    private void ShowEditSession(InventorySession session)
+    {
+        _editingSession = session;
+        _sessionForm = new SessionFormModel
+        {
+            SessionName = session.SessionName,
+            SessionDate = session.SessionDate,
+            Frequency = session.Frequency,
+            CountedBy = session.CountedBy,
+            Notes = session.Notes
+        };
+        _showSessionModal = true;
+    }
+    
+    private void ShowCompleteConfirm()
+    {
+        _showCompleteConfirm = true;
+    }
+    
+    private void ShowDeleteConfirm(InventorySession session)
+    {
+        _sessionToDelete = session;
+        _showDeleteConfirm = true;
+    }
+    
+    private void CloseModals()
+    {
+        _showSessionModal = false;
+        _showCompleteConfirm = false;
+        _showDeleteConfirm = false;
+        _showViewModal = false;
+        _editingSession = null;
+        _sessionToDelete = null;
+        _viewingSession = null;
+    }
+    
+    private void SaveSession()
+    {
+        if (string.IsNullOrWhiteSpace(_sessionForm.SessionName))
+        {
+            return;
+        }
+        
+        if (_editingSession != null)
+        {
+            // Update existing
+            _editingSession.SessionName = _sessionForm.SessionName;
+            _editingSession.SessionDate = _sessionForm.SessionDate;
+            _editingSession.Frequency = _sessionForm.Frequency;
+            _editingSession.CountedBy = _sessionForm.CountedBy;
+            _editingSession.Notes = _sessionForm.Notes;
+            InventoryService.UpdateSession(_editingSession);
+        }
+        else
+        {
+            // Create new
+            var session = new InventorySession
+            {
+                SessionName = _sessionForm.SessionName,
+                SessionDate = _sessionForm.SessionDate,
+                Frequency = _sessionForm.Frequency,
+                CountedBy = _sessionForm.CountedBy,
+                Notes = _sessionForm.Notes
+            };
+            
+            InventoryService.CreateSession(session, _copyPreviousData);
+        }
+        
+        CloseModals();
+        LoadData();
+    }
+    
+    private void CompleteSession()
+    {
+        if (_activeSession != null)
+        {
+            InventoryService.CompleteSession(_activeSession.Id);
+        }
+        CloseModals();
+        LoadData();
+    }
+    
+    private void DeleteSession()
+    {
+        if (_sessionToDelete != null)
+        {
+            InventoryService.DeleteSession(_sessionToDelete.Id);
+        }
+        CloseModals();
+        LoadData();
+    }
+    
+    private void ViewSession(int sessionId)
+    {
+        _viewingSession = InventoryService.GetSession(sessionId);
+        if (_viewingSession != null)
+        {
+            _viewSummary = InventoryService.GetSessionSummary(sessionId);
+            _showViewModal = true;
+        }
+    }
+    
+    private string GenerateSessionName()
+    {
+        var now = DateTime.Now;
+        var weekNumber = System.Globalization.CultureInfo.CurrentCulture.Calendar
+            .GetWeekOfYear(now, System.Globalization.CalendarWeekRule.FirstDay, DayOfWeek.Monday);
+        return $"Week {weekNumber} - {now:MMMM yyyy}";
+    }
+    
+    private class SessionFormModel
+    {
+        public string SessionName { get; set; } = string.Empty;
+        public DateTime SessionDate { get; set; } = DateTime.Now;
+        public InventoryFrequency Frequency { get; set; } = InventoryFrequency.Weekly;
+        public string CountedBy { get; set; } = string.Empty;
+        public string? Notes { get; set; }
+    }
+}

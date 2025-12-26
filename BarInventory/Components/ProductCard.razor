@@ -1,0 +1,89 @@
+@* Product card component for inventory capture *@
+
+<div class="inventory-item @GetStatusClass()">
+    <div class="item-header">
+        <div>
+            <div class="item-name">@Product.DisplayName</div>
+            <div class="item-meta">@Product.SizeDescription • $@Product.UnitCost.ToString("0.00")</div>
+        </div>
+        <span class="item-badge @GetCategoryBadgeClass()">@GetCategoryLabel()</span>
+    </div>
+    
+    @if (ShowCounts)
+    {
+        <div class="d-flex justify-between align-center gap-sm mt-sm" style="flex-wrap: wrap;">
+            <div>
+                <span class="text-muted" style="font-size: 0.85rem;">Starting:</span>
+                <strong>@StartingQuantity.ToString("0.0")</strong>
+            </div>
+            <div>
+                <span class="text-muted" style="font-size: 0.85rem;">Received:</span>
+                <strong>@ReceivedQuantity.ToString("0.0")</strong>
+            </div>
+            <div>
+                <span class="text-muted" style="font-size: 0.85rem;">Current:</span>
+                <strong style="color: var(--accent-blue);">@CurrentOnHand.ToString("0.0")</strong>
+            </div>
+            @if (ShowVariance && Math.Abs(Variance) > 0.1m)
+            {
+                <div>
+                    <span class="text-muted" style="font-size: 0.85rem;">Variance:</span>
+                    <strong class='@(Variance > 0 ? "text-danger" : "text-success")'>
+                        @(Variance > 0 ? "+" : "")@Variance.ToString("0.0")
+                    </strong>
+                </div>
+            }
+        </div>
+    }
+    
+    @if (ChildContent != null)
+    {
+        @ChildContent
+    }
+</div>
+
+@code {
+    [Parameter] public Product Product { get; set; } = null!;
+    [Parameter] public decimal StartingQuantity { get; set; }
+    [Parameter] public decimal ReceivedQuantity { get; set; }
+    [Parameter] public decimal CurrentOnHand { get; set; }
+    [Parameter] public decimal Variance { get; set; }
+    [Parameter] public bool IsCounted { get; set; }
+    [Parameter] public bool ShowCounts { get; set; } = true;
+    [Parameter] public bool ShowVariance { get; set; } = true;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    
+    private string GetStatusClass()
+    {
+        if (Math.Abs(Variance) > 2)
+            return "variance-danger";
+        if (Math.Abs(Variance) > 0.5m)
+            return "variance-warning";
+        if (IsCounted)
+            return "counted";
+        return "";
+    }
+    
+    private string GetCategoryBadgeClass() => Product.Category switch
+    {
+        ProductCategory.Liquor => "badge-liquor",
+        ProductCategory.Wine => "badge-wine",
+        ProductCategory.BeerBottle => "badge-beer-bottle",
+        ProductCategory.BeerCan => "badge-beer-can",
+        ProductCategory.Seltzer => "badge-seltzer",
+        ProductCategory.DraftBeer => "badge-draft",
+        _ => ""
+    };
+    
+    private string GetCategoryLabel() => Product.Category switch
+    {
+        ProductCategory.Liquor => "Liquor",
+        ProductCategory.Wine => "Wine",
+        ProductCategory.BeerBottle => "Bottle",
+        ProductCategory.BeerCan => "Can",
+        ProductCategory.Seltzer => "Seltzer",
+        ProductCategory.DraftBeer => "Draft",
+        ProductCategory.Mixers => "Mixer",
+        _ => "Other"
+    };
+}
