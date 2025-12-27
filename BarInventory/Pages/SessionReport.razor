@@ -362,6 +362,25 @@ else
     {
         LoadData();
     }
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                var isLoggedIn = await JS.InvokeAsync<bool>("authHelper.isLoggedIn");
+                if (!isLoggedIn)
+                {
+                    Navigation.NavigateTo("/", true);
+                }
+            }
+            catch
+            {
+                Navigation.NavigateTo("/", true);
+            }
+        }
+    }
 
     private void LoadData()
     {

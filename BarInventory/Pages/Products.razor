@@ -237,6 +237,9 @@
 
     [Inject]
     private NavigationManager NavigationManager { get; set; } = default!;
+    
+    [Inject]
+    private IJSRuntime JS { get; set; } = default!;
 
     // Data Lists
     protected List<ProductsQueryResult>? ProductList { get; set; } = null;
@@ -263,6 +266,21 @@
     {
         if (firstRender)
         {
+            try
+            {
+                var isLoggedIn = await JS.InvokeAsync<bool>("authHelper.isLoggedIn");
+                if (!isLoggedIn)
+                {
+                    NavigationManager.NavigateTo("/", true);
+                    return;
+                }
+            }
+            catch
+            {
+                NavigationManager.NavigateTo("/", true);
+                return;
+            }
+            
             BuildDropDowns();
             LoadData();
             StateHasChanged();

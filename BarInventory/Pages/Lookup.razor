@@ -199,6 +199,10 @@ else
 @code {
     [Inject]
     private BarInventory.BarDB.Service DbService { get; set; } = default!;
+    [Inject]
+    private IJSRuntime JS { get; set; } = default!;
+    [Inject]
+    private NavigationManager Navigation { get; set; } = default!;
 
     // Data
     protected List<ProductsQueryResult>? ProductList = null;
@@ -219,6 +223,21 @@ else
     {
         if (firstRender)
         {
+            try
+            {
+                var isLoggedIn = await JS.InvokeAsync<bool>("authHelper.isLoggedIn");
+                if (!isLoggedIn)
+                {
+                    Navigation.NavigateTo("/", true);
+                    return;
+                }
+            }
+            catch
+            {
+                Navigation.NavigateTo("/", true);
+                return;
+            }
+            
             BuildDropDowns();
             LoadProducts();
             StateHasChanged();

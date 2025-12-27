@@ -379,6 +379,8 @@
 
 
     [Inject] private BarInventory.BarDB.Service DbService { get; set; } = default!;
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
 
     private string ActiveTab = "categories";
 
@@ -409,6 +411,25 @@
     protected override void OnInitialized()
     {
         LoadAllData();
+    }
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                var isLoggedIn = await JS.InvokeAsync<bool>("authHelper.isLoggedIn");
+                if (!isLoggedIn)
+                {
+                    Navigation.NavigateTo("/", true);
+                }
+            }
+            catch
+            {
+                Navigation.NavigateTo("/", true);
+            }
+        }
     }
 
     private void LoadAllData()
