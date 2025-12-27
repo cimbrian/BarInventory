@@ -46,7 +46,7 @@ Sessions expire after 30 days and require re-login.
 |-----------|------------|
 | **Framework** | .NET 8 Blazor Server |
 | **Database** | SQL Server / Azure SQL |
-| **ORM** | SQL PLUS .NET (VSIX) |
+| **ORM** | [SQL PLUS .NET](https://sqlplus.net/) by AHH Software |
 | **Hosting** | Azure App Service (Free Tier compatible) |
 | **UI** | Custom CSS, Mobile-optimized |
 | **PWA** | Service Worker, Manifest |
@@ -60,7 +60,7 @@ Sessions expire after 30 days and require re-login.
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
 - [Visual Studio 2022](https://visualstudio.microsoft.com/) or VS Code
 - SQL Server (LocalDB, SQL Server, or Azure SQL)
-- [SQL PLUS .NET VSIX](https://marketplace.visualstudio.com/items?itemName=nicholabs.sql-plus-net) (for ORM regeneration)
+- [SQL PLUS .NET VSIX](https://sqlplus.net/) (for ORM regeneration)
 
 ### Clone & Build
 
@@ -201,10 +201,13 @@ To remove test data while keeping reference types:
 
 ### SQL PLUS .NET ORM
 
-This project uses SQL PLUS .NET for database access. The VSIX generates C# models and services from stored procedures.
+This project uses [SQL PLUS .NET](https://sqlplus.net/) for database access. The VSIX generates C# models and services from stored procedures.
+
+**Created by:** AHH Software — ORM creator Alan Hyneman  
+**GitHub:** [ahhsoftware/sql-plus-version-four-builder](https://github.com/ahhsoftware/sql-plus-version-four-builder)
 
 **Installation:**
-1. Download from [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=nicholabs.sql-plus-net)
+1. Download the VSIX from [sqlplus.net](https://sqlplus.net/)
 2. Install the VSIX in Visual Studio 2022
 
 **Regenerating ORM Classes:**
