@@ -255,8 +255,9 @@ This project uses [SQL PLUS .NET](https://sqlplus.net/) for database access. The
 SQL+ offers code snippets for SQL Server Management Studio to help with stored procedure parameter decorations:
 
 1. Download: [CodeSnippits.zip](https://sqlplus.net/downloads/CodeSnippits.zip)
-2. Extract and install per SSMS version instructions
-3. Use `Ctrl+K, Ctrl+X` in SSMS to access SQL+ snippets
+2. Extract the `+` folder to your My Documents or other folder
+3. In SSMS: Go to **Tools** menu → **Code Snippets Manager** → click **Add** and select the `+` folder you saved
+4. Use `Ctrl+K, Ctrl+X` in SSMS to access SQL+ snippets
 
 **Regenerating ORM Classes:**
 1. Open SQL Server Object Explorer in Visual Studio
