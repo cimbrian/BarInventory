@@ -415,7 +415,7 @@ else
             var thisMonth = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
             var monthlyLosses = lossesOutput.ResultData.Where(l => l.OccurredAt >= thisMonth).ToList();
             TotalLossValue = monthlyLosses.Sum(l => l.EstimatedValue);
-            RecentLosses = lossesOutput.ResultData.OrderByDescending(l => l.OccurredAt).Take(5).ToList();
+            RecentLosses = lossesOutput.ResultData.OrderByDescending(l => l.OccurredAt).Take(15).ToList();
         }
     }
 
