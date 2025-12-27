@@ -1,0 +1,1055 @@
+@page "/training"
+@using BarInventory.BarDB
+
+<div class="training-page">
+    <div class="training-header">
+        <h1>📚 CzarWare Inventory Training Guide</h1>
+        <p class="subtitle">Everything you need to know to master bar inventory management</p>
+    </div>
+    
+    @* Table of Contents *@
+    <div class="card toc-card">
+        <div class="card-header">
+            <h2 class="card-title">📋 Table of Contents</h2>
+        </div>
+        <div class="card-body">
+            <div class="toc-grid">
+                <a href="#overview" class="toc-link">
+                    <span class="toc-number">1</span>
+                    <span class="toc-text">Overview & Concepts</span>
+                </a>
+                <a href="#dashboard" class="toc-link">
+                    <span class="toc-number">2</span>
+                    <span class="toc-text">Dashboard</span>
+                </a>
+                <a href="#sessions" class="toc-link">
+                    <span class="toc-number">3</span>
+                    <span class="toc-text">Sessions</span>
+                </a>
+                <a href="#capture" class="toc-link">
+                    <span class="toc-number">4</span>
+                    <span class="toc-text">Counting Inventory</span>
+                </a>
+                <a href="#products" class="toc-link">
+                    <span class="toc-number">5</span>
+                    <span class="toc-text">Managing Products</span>
+                </a>
+                <a href="#losses" class="toc-link">
+                    <span class="toc-number">6</span>
+                    <span class="toc-text">Recording Losses</span>
+                </a>
+                <a href="#lookup" class="toc-link">
+                    <span class="toc-number">7</span>
+                    <span class="toc-text">Quick Lookup</span>
+                </a>
+                <a href="#reports" class="toc-link">
+                    <span class="toc-number">8</span>
+                    <span class="toc-text">Session Reports</span>
+                </a>
+                <a href="#workflows" class="toc-link">
+                    <span class="toc-number">9</span>
+                    <span class="toc-text">Common Workflows</span>
+                </a>
+                <a href="#tips" class="toc-link">
+                    <span class="toc-number">10</span>
+                    <span class="toc-text">Tips & Best Practices</span>
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    @* Section 1: Overview *@
+    <section id="overview" class="training-section">
+        <h2><span class="section-icon">🎯</span> 1. Overview & Concepts</h2>
+        
+        <div class="concept-card">
+            <h3>What is CzarWare Inventory?</h3>
+            <p>CzarWare Inventory is a mobile-friendly bar inventory management system designed for weekly or periodic inventory counts. It helps you:</p>
+            <ul>
+                <li><strong>Track what you have</strong> — Count bottles across all storage areas</li>
+                <li><strong>Record what you receive</strong> — Log deliveries during each period</li>
+                <li><strong>Document losses</strong> — Track breakage, spillage, comps, and other losses</li>
+                <li><strong>Analyze usage</strong> — Compare counts to identify variances and trends</li>
+            </ul>
+        </div>
+        
+        <div class="concept-card">
+            <h3>Key Concepts</h3>
+            
+            <div class="concept-item">
+                <h4>📅 Sessions</h4>
+                <p>A <strong>session</strong> represents one inventory counting period (typically weekly). Each session is independent — when you start a new session, all counts reset to zero so you can count fresh.</p>
+            </div>
+            
+            <div class="concept-item">
+                <h4>📍 Areas</h4>
+                <p><strong>Areas</strong> are the physical locations where you store inventory: Main Bar Well, Back Bar, Walk-in Cooler, Dry Storage, etc. You count each product in each area where it exists.</p>
+            </div>
+            
+            <div class="concept-item">
+                <h4>📦 Products</h4>
+                <p><strong>Products</strong> are the items you're tracking — bottles of liquor, wine, beer, mixers, etc. Each product has a brand, name, size, category, and unit cost.</p>
+            </div>
+            
+            <div class="concept-item">
+                <h4>🔢 Counts</h4>
+                <p>For each product, you record <strong>full units</strong> (complete bottles) and optionally <strong>partial amounts</strong> (open bottles measured in tenths). A count of "3.7" means 3 full bottles plus one bottle that's 70% full.</p>
+            </div>
+            
+            <div class="concept-item">
+                <h4>📥 Received</h4>
+                <p>The <strong>received quantity</strong> tracks how many units were delivered during this counting period. This helps calculate actual usage.</p>
+            </div>
+        </div>
+        
+        <div class="concept-card highlight-card">
+            <h3>💡 The Inventory Formula</h3>
+            <p class="formula">
+                <strong>Usage</strong> = Previous Count + Received − Current Count − Losses
+            </p>
+            <p>Understanding this formula helps you spot problems. If usage seems too high, you might have unrecorded losses or theft. If it seems too low, check for missed deliveries.</p>
+        </div>
+    </section>
+    
+    @* Section 2: Dashboard *@
+    <section id="dashboard" class="training-section">
+        <h2><span class="section-icon">📊</span> 2. Dashboard</h2>
+        
+        <p>The Dashboard is your home screen, showing a quick overview of your current inventory session.</p>
+        
+        @* SCREENSHOT: Dashboard overview *@
+        <div class="screenshot-placeholder">
+            <span>📸 Screenshot: Dashboard showing session stats and quick actions</span>
+        </div>
+        
+        <div class="feature-list">
+            <div class="feature-item">
+                <h4>Session Summary Cards</h4>
+                <p>At the top, you'll see key metrics for the current session:</p>
+                <ul>
+                    <li><strong>Total On Hand</strong> — Sum of all counted inventory</li>
+                    <li><strong>Inventory Value</strong> — Dollar value of current stock</li>
+                    <li><strong>Items Counted</strong> — Progress toward completing the count</li>
+                    <li><strong>Items with Variance</strong> — Products with unexpected changes</li>
+                </ul>
+            </div>
+            
+            <div class="feature-item">
+                <h4>Quick Actions</h4>
+                <p>Large buttons for common tasks:</p>
+                <ul>
+                    <li><strong>Start Counting</strong> — Jump directly to the Capture page</li>
+                    <li><strong>Record Loss</strong> — Log a breakage or other loss</li>
+                    <li><strong>View Report</strong> — See the full session report</li>
+                </ul>
+            </div>
+            
+            <div class="feature-item">
+                <h4>Recent Activity</h4>
+                <p>Shows the most recent counts and changes, so you can see what's been done.</p>
+            </div>
+        </div>
+    </section>
+    
+    @* Section 3: Sessions *@
+    <section id="sessions" class="training-section">
+        <h2><span class="section-icon">📅</span> 3. Sessions</h2>
+        
+        <p>The Sessions page is where you create and manage inventory counting periods.</p>
+        
+        @* SCREENSHOT: Sessions list *@
+        <div class="screenshot-placeholder">
+            <span>📸 Screenshot: Sessions page showing list of sessions with status</span>
+        </div>
+        
+        <div class="feature-list">
+            <div class="feature-item">
+                <h4>Creating a New Session</h4>
+                <ol>
+                    <li>Click the <strong>+ New Session</strong> button</li>
+                    <li>Enter a descriptive name (e.g., "Week 52 - December 2025")</li>
+                    <li>Set the session date</li>
+                    <li>Choose the counting frequency (Weekly, Monthly, etc.)</li>
+                    <li>Click <strong>Create Session</strong></li>
+                </ol>
+                <p class="tip">💡 When you create a new session, inventory items are automatically created for all active products — all starting at zero, ready to count.</p>
+            </div>
+            
+            <div class="feature-item">
+                <h4>Session Status</h4>
+                <ul>
+                    <li><span class="status-badge status-active">Active</span> — Currently in progress, ready for counting</li>
+                    <li><span class="status-badge status-complete">Complete</span> — Finished and locked</li>
+                </ul>
+            </div>
+            
+            <div class="feature-item">
+                <h4>Viewing Session Details</h4>
+                <p>Click any session row to see a summary with:</p>
+                <ul>
+                    <li>Total inventory value</li>
+                    <li>Count progress</li>
+                    <li>Losses recorded</li>
+                    <li>Link to full printable report</li>
+                </ul>
+            </div>
+            
+            <div class="feature-item">
+                <h4>Completing a Session</h4>
+                <p>When you're done counting:</p>
+                <ol>
+                    <li>Click the session to open it</li>
+                    <li>Click <strong>Edit</strong></li>
+                    <li>Check the <strong>Mark as Complete</strong> checkbox</li>
+                    <li>Save changes</li>
+                </ol>
+                <p class="warning">⚠️ Completed sessions cannot be edited. Make sure all counts are final before completing.</p>
+            </div>
+        </div>
+    </section>
+    
+    @* Section 4: Capture *@
+    <section id="capture" class="training-section">
+        <h2><span class="section-icon">📝</span> 4. Counting Inventory (Capture)</h2>
+        
+        <p>The Capture page is where you do the actual counting. It's designed for efficiency on mobile devices.</p>
+        
+        @* SCREENSHOT: Capture page overview *@
+        <div class="screenshot-placeholder">
+            <span>📸 Screenshot: Capture page with area tabs and product list</span>
+        </div>
+        
+        <div class="feature-list">
+            <div class="feature-item">
+                <h4>Area Tabs</h4>
+                <p>At the top, you'll see tabs for each storage area:</p>
+                <ul>
+                    <li><strong>All Areas</strong> — Shows total counts across all locations</li>
+                    <li><strong>Individual Areas</strong> — Filter to count one area at a time (recommended)</li>
+                </ul>
+                <p class="tip">💡 <strong>Best Practice:</strong> Select a specific area, physically go to that location, and count everything there before moving to the next area.</p>
+            </div>
+            
+            <div class="feature-item">
+                <h4>Counting by Area (Recommended Method)</h4>
+                @* SCREENSHOT: Area-filtered view with +/- buttons *@
+                <div class="screenshot-placeholder">
+                    <span>📸 Screenshot: Counting in a specific area with +/- controls and ✓ button</span>
+                </div>
+                <ol>
+                    <li>Select an area tab (e.g., "Main Bar Well")</li>
+                    <li>For each product, use <strong>−</strong> and <strong>+</strong> to set the count</li>
+                    <li>Click <strong>½</strong> to record a partial bottle</li>
+                    <li>Click the <strong>✓</strong> button when done with that product</li>
+                    <li>Product gets strikethrough styling to show it's counted</li>
+                </ol>
+            </div>
+            
+            <div class="feature-item">
+                <h4>Counting All Areas (Expanded View)</h4>
+                @* SCREENSHOT: Expanded view with all areas *@
+                <div class="screenshot-placeholder">
+                    <span>📸 Screenshot: Expanded product showing all area count cards</span>
+                </div>
+                <p>When on "All Areas" tab:</p>
+                <ol>
+                    <li>Click <strong>▶ Areas</strong> to expand a product</li>
+                    <li>You'll see count controls for every area</li>
+                    <li>Enter counts for each area where the product exists</li>
+                    <li>Enter <strong>Received this period</strong> if deliveries came in</li>
+                    <li>Click <strong>✓ Done</strong> when finished</li>
+                </ol>
+            </div>
+            
+            <div class="feature-item">
+                <h4>Recording Partial Bottles</h4>
+                @* SCREENSHOT: Partial bottle modal *@
+                <div class="screenshot-placeholder">
+                    <span>📸 Screenshot: Partial bottle selection modal (1-10 tenths)</span>
+                </div>
+                <p>For open bottles:</p>
+                <ol>
+                    <li>Click <strong>½</strong> or <strong>+ partial</strong></li>
+                    <li>Select the fill level (1-10, where 10 = full)</li>
+                    <li>Click <strong>Save</strong></li>
+                </ol>
+                <p>Example: A bottle that's about 70% full would be "7"</p>
+            </div>
+            
+            <div class="feature-item">
+                <h4>Filter Tabs</h4>
+                <p>Below the search bar, filter buttons help you focus:</p>
+                <ul>
+                    <li><strong>All</strong> — Show everything</li>
+                    <li><strong>Uncounted</strong> — Only items not yet marked done</li>
+                    <li><strong>Counted</strong> — Only completed items (for review)</li>
+                </ul>
+            </div>
+            
+            <div class="feature-item">
+                <h4>Search</h4>
+                <p>Type in the search box to quickly find a product by name or brand.</p>
+            </div>
+            
+            <div class="feature-item">
+                <h4>Complete Session</h4>
+                <p>When all counting is done, scroll to the bottom and click <strong>✓ Complete Session</strong> to finalize.</p>
+            </div>
+        </div>
+    </section>
+    
+    @* Section 5: Products *@
+    <section id="products" class="training-section">
+        <h2><span class="section-icon">📦</span> 5. Managing Products</h2>
+        
+        <p>The Products page is your master list of everything you track.</p>
+        
+        @* SCREENSHOT: Products page *@
+        <div class="screenshot-placeholder">
+            <span>📸 Screenshot: Products page with category filter and product list</span>
+        </div>
+        
+        <div class="feature-list">
+            <div class="feature-item">
+                <h4>Adding a New Product</h4>
+                <ol>
+                    <li>Click <strong>+ Add Product</strong></li>
+                    <li>Fill in the details:
+                        <ul>
+                            <li><strong>Brand</strong> — Manufacturer (e.g., "Absolut")</li>
+                            <li><strong>Name</strong> — Product name (e.g., "Citron Vodka")</li>
+                            <li><strong>Category</strong> — Type of product (Spirits, Wine, Beer, etc.)</li>
+                            <li><strong>Container Type</strong> — Bottle, Can, Keg, etc.</li>
+                            <li><strong>Size</strong> — Volume (e.g., "750ml", "1L")</li>
+                            <li><strong>Unit Cost</strong> — Your cost per unit</li>
+                        </ul>
+                    </li>
+                    <li>Click <strong>Add Product</strong></li>
+                </ol>
+                <p class="tip">💡 New products are automatically added to future sessions. For the current session, they'll appear after the session is refreshed.</p>
+            </div>
+            
+            <div class="feature-item">
+                <h4>Editing Products</h4>
+                <p>Click any product row to edit its details. You can update costs, change categories, or mark products as inactive.</p>
+            </div>
+            
+            <div class="feature-item">
+                <h4>Active vs Inactive</h4>
+                <ul>
+                    <li><strong>Active</strong> — Included in new inventory sessions</li>
+                    <li><strong>Inactive</strong> — Hidden from new sessions (use for discontinued items)</li>
+                </ul>
+            </div>
+            
+            <div class="feature-item">
+                <h4>Filtering by Category</h4>
+                <p>Use the category dropdown to view only specific types (Spirits, Wine, Beer, etc.)</p>
+            </div>
+        </div>
+    </section>
+    
+    @* Section 6: Losses *@
+    <section id="losses" class="training-section">
+        <h2><span class="section-icon">📉</span> 6. Recording Losses</h2>
+        
+        <p>The Losses page tracks inventory that was lost, not sold — breakage, spillage, comps, etc.</p>
+        
+        @* SCREENSHOT: Losses page *@
+        <div class="screenshot-placeholder">
+            <span>📸 Screenshot: Losses page with loss entry form and history table</span>
+        </div>
+        
+        <div class="feature-list">
+            <div class="feature-item">
+                <h4>Why Record Losses?</h4>
+                <p>Without loss records, missing inventory looks like theft or miscounting. Recording losses:</p>
+                <ul>
+                    <li>Explains variances in your counts</li>
+                    <li>Helps identify problem areas (too much breakage?)</li>
+                    <li>Provides accurate usage data</li>
+                    <li>Creates accountability</li>
+                </ul>
+            </div>
+            
+            <div class="feature-item">
+                <h4>Recording a Loss</h4>
+                <ol>
+                    <li>Select the <strong>Loss Type</strong>:
+                        <ul>
+                            <li>💔 Breakage — Dropped or broken bottles</li>
+                            <li>💧 Spillage — Accidental spills</li>
+                            <li>🎁 Comp — Given away free</li>
+                            <li>🗑️ Spoilage — Expired or bad product</li>
+                            <li>🍸 Over-pour — Excessive portions</li>
+                            <li>↩️ Return — Sent back to vendor</li>
+                        </ul>
+                    </li>
+                    <li>Search and select the <strong>Product</strong></li>
+                    <li>Enter the <strong>Quantity</strong> lost</li>
+                    <li>Add a <strong>Reason</strong> (optional but helpful)</li>
+                    <li>Click <strong>+ Add Loss</strong></li>
+                </ol>
+            </div>
+            
+            <div class="feature-item">
+                <h4>Loss Summary</h4>
+                <p>The page shows:</p>
+                <ul>
+                    <li>Total loss value for the current session</li>
+                    <li>Breakdown by loss type</li>
+                    <li>Complete history of all losses</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+    
+    @* Section 7: Lookup *@
+    <section id="lookup" class="training-section">
+        <h2><span class="section-icon">🔍</span> 7. Quick Lookup</h2>
+        
+        <p>The Lookup page lets you quickly check current inventory levels for any product.</p>
+        
+        @* SCREENSHOT: Lookup page *@
+        <div class="screenshot-placeholder">
+            <span>📸 Screenshot: Lookup page with search and product detail card</span>
+        </div>
+        
+        <div class="feature-list">
+            <div class="feature-item">
+                <h4>When to Use Lookup</h4>
+                <ul>
+                    <li>Checking if you need to reorder something</li>
+                    <li>Answering "do we have any X?" questions</li>
+                    <li>Verifying counts without going to Capture</li>
+                    <li>Quick reference during service</li>
+                </ul>
+            </div>
+            
+            <div class="feature-item">
+                <h4>How to Use</h4>
+                <ol>
+                    <li>Type a product name or brand in the search box</li>
+                    <li>Click on a result to see full details</li>
+                    <li>View counts by area and total on hand</li>
+                </ol>
+            </div>
+        </div>
+    </section>
+    
+    @* Section 8: Reports *@
+    <section id="reports" class="training-section">
+        <h2><span class="section-icon">📄</span> 8. Session Reports</h2>
+        
+        <p>Session Reports provide a complete printable summary of an inventory session.</p>
+        
+        @* SCREENSHOT: Session Report *@
+        <div class="screenshot-placeholder">
+            <span>📸 Screenshot: Session report showing inventory summary and details</span>
+        </div>
+        
+        <div class="feature-list">
+            <div class="feature-item">
+                <h4>Accessing Reports</h4>
+                <ul>
+                    <li>From Dashboard: Click <strong>View Report</strong></li>
+                    <li>From Sessions: Click a session, then <strong>📄 Print Report</strong></li>
+                </ul>
+            </div>
+            
+            <div class="feature-item">
+                <h4>Report Contents</h4>
+                <ul>
+                    <li><strong>Header</strong> — Session name, date, status</li>
+                    <li><strong>Summary Stats</strong> — Total value, items counted, losses</li>
+                    <li><strong>Inventory by Category</strong> — Detailed breakdown of all products</li>
+                    <li><strong>Area Breakdown</strong> — Where inventory is located</li>
+                    <li><strong>Loss Summary</strong> — All recorded losses</li>
+                </ul>
+            </div>
+            
+            <div class="feature-item">
+                <h4>Printing</h4>
+                <p>The report is optimized for printing:</p>
+                <ol>
+                    <li>Open the report</li>
+                    <li>Click <strong>🖨️ Print Report</strong> or use Ctrl+P / Cmd+P</li>
+                    <li>Select your printer or "Save as PDF"</li>
+                </ol>
+            </div>
+        </div>
+    </section>
+    
+    @* Section 9: Workflows *@
+    <section id="workflows" class="training-section">
+        <h2><span class="section-icon">🔄</span> 9. Common Workflows</h2>
+        
+        <div class="workflow-card">
+            <h3>📋 Weekly Inventory Count</h3>
+            <div class="workflow-steps">
+                <div class="workflow-step">
+                    <span class="step-number">1</span>
+                    <div class="step-content">
+                        <h4>Start the Session</h4>
+                        <p>Go to <strong>Sessions</strong> → <strong>+ New Session</strong></p>
+                        <p>Name it (e.g., "Week 1 - January 2026") and save</p>
+                    </div>
+                </div>
+                <div class="workflow-step">
+                    <span class="step-number">2</span>
+                    <div class="step-content">
+                        <h4>Count Each Area</h4>
+                        <p>Go to <strong>Capture</strong></p>
+                        <p>Select first area tab (e.g., "Main Bar Well")</p>
+                        <p>Physically go to that location with your device</p>
+                        <p>Count each product, clicking ✓ when done</p>
+                        <p>Repeat for each area</p>
+                    </div>
+                </div>
+                <div class="workflow-step">
+                    <span class="step-number">3</span>
+                    <div class="step-content">
+                        <h4>Record Deliveries</h4>
+                        <p>For any products received this week:</p>
+                        <p>Expand the product → Enter "Received this period"</p>
+                    </div>
+                </div>
+                <div class="workflow-step">
+                    <span class="step-number">4</span>
+                    <div class="step-content">
+                        <h4>Log Any Losses</h4>
+                        <p>Go to <strong>Losses</strong></p>
+                        <p>Record any breakage, spillage, comps, etc.</p>
+                    </div>
+                </div>
+                <div class="workflow-step">
+                    <span class="step-number">5</span>
+                    <div class="step-content">
+                        <h4>Review & Complete</h4>
+                        <p>Check the <strong>Uncounted</strong> filter — should be zero</p>
+                        <p>Review the session report for any issues</p>
+                        <p>Click <strong>Complete Session</strong></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="workflow-card">
+            <h3>💔 Recording a Broken Bottle</h3>
+            <div class="workflow-steps">
+                <div class="workflow-step">
+                    <span class="step-number">1</span>
+                    <div class="step-content">
+                        <p>Go to <strong>Losses</strong></p>
+                    </div>
+                </div>
+                <div class="workflow-step">
+                    <span class="step-number">2</span>
+                    <div class="step-content">
+                        <p>Select <strong>Breakage</strong> as loss type</p>
+                    </div>
+                </div>
+                <div class="workflow-step">
+                    <span class="step-number">3</span>
+                    <div class="step-content">
+                        <p>Search for and select the product</p>
+                    </div>
+                </div>
+                <div class="workflow-step">
+                    <span class="step-number">4</span>
+                    <div class="step-content">
+                        <p>Enter quantity (usually 1)</p>
+                    </div>
+                </div>
+                <div class="workflow-step">
+                    <span class="step-number">5</span>
+                    <div class="step-content">
+                        <p>Add reason: "Dropped while restocking"</p>
+                    </div>
+                </div>
+                <div class="workflow-step">
+                    <span class="step-number">6</span>
+                    <div class="step-content">
+                        <p>Click <strong>+ Add Loss</strong></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="workflow-card">
+            <h3>📦 Adding a New Product</h3>
+            <div class="workflow-steps">
+                <div class="workflow-step">
+                    <span class="step-number">1</span>
+                    <div class="step-content">
+                        <p>Go to <strong>Products</strong> → <strong>+ Add Product</strong></p>
+                    </div>
+                </div>
+                <div class="workflow-step">
+                    <span class="step-number">2</span>
+                    <div class="step-content">
+                        <p>Enter brand, name, category, size, cost</p>
+                    </div>
+                </div>
+                <div class="workflow-step">
+                    <span class="step-number">3</span>
+                    <div class="step-content">
+                        <p>Save the product</p>
+                    </div>
+                </div>
+                <div class="workflow-step">
+                    <span class="step-number">4</span>
+                    <div class="step-content">
+                        <p>Product will appear in the next new session automatically</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="workflow-card">
+            <h3>🔍 Investigating a Variance</h3>
+            <div class="workflow-steps">
+                <div class="workflow-step">
+                    <span class="step-number">1</span>
+                    <div class="step-content">
+                        <p>Note which product shows unexpected usage</p>
+                    </div>
+                </div>
+                <div class="workflow-step">
+                    <span class="step-number">2</span>
+                    <div class="step-content">
+                        <p>Check <strong>Losses</strong> — was breakage recorded?</p>
+                    </div>
+                </div>
+                <div class="workflow-step">
+                    <span class="step-number">3</span>
+                    <div class="step-content">
+                        <p>Verify <strong>Received</strong> quantity is correct</p>
+                    </div>
+                </div>
+                <div class="workflow-step">
+                    <span class="step-number">4</span>
+                    <div class="step-content">
+                        <p>Use <strong>Lookup</strong> to check counts by area</p>
+                    </div>
+                </div>
+                <div class="workflow-step">
+                    <span class="step-number">5</span>
+                    <div class="step-content">
+                        <p>Physically recount if necessary</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    @* Section 10: Tips *@
+    <section id="tips" class="training-section">
+        <h2><span class="section-icon">💡</span> 10. Tips & Best Practices</h2>
+        
+        <div class="tips-grid">
+            <div class="tip-card">
+                <div class="tip-icon">📱</div>
+                <h4>Use Your Phone</h4>
+                <p>The app is designed for mobile. Walk around with your phone and count in real-time.</p>
+            </div>
+            
+            <div class="tip-card">
+                <div class="tip-icon">📍</div>
+                <h4>Count by Area</h4>
+                <p>Always select a specific area tab. Don't try to count "All Areas" at once.</p>
+            </div>
+            
+            <div class="tip-card">
+                <div class="tip-icon">⏰</div>
+                <h4>Same Time Each Week</h4>
+                <p>Count at the same time each period for consistent comparisons.</p>
+            </div>
+            
+            <div class="tip-card">
+                <div class="tip-icon">📝</div>
+                <h4>Log Losses Immediately</h4>
+                <p>Record breakage and spillage when it happens, not later.</p>
+            </div>
+            
+            <div class="tip-card">
+                <div class="tip-icon">🔍</div>
+                <h4>Use Search</h4>
+                <p>Don't scroll endlessly. Type a few letters to find products fast.</p>
+            </div>
+            
+            <div class="tip-card">
+                <div class="tip-icon">✓</div>
+                <h4>Mark Items Done</h4>
+                <p>Click the checkmark after counting each item to track progress.</p>
+            </div>
+            
+            <div class="tip-card">
+                <div class="tip-icon">📊</div>
+                <h4>Review Reports</h4>
+                <p>Look at your session report before completing. Catch errors early.</p>
+            </div>
+            
+            <div class="tip-card">
+                <div class="tip-icon">🔄</div>
+                <h4>Complete Old Sessions</h4>
+                <p>Always complete the previous session before starting a new one.</p>
+            </div>
+        </div>
+    </section>
+    
+    <div class="training-footer">
+        <p>Questions? Contact your manager or system administrator.</p>
+        <a href="/" class="btn btn-primary">← Back to Dashboard</a>
+    </div>
+</div>
+
+<style>
+    .training-page {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 1rem;
+    }
+    
+    .training-header {
+        text-align: center;
+        margin-bottom: 2rem;
+        padding: 2rem 1rem;
+        background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary));
+        border-radius: var(--radius-lg);
+    }
+    
+    .training-header h1 {
+        margin: 0 0 0.5rem 0;
+        font-size: 1.75rem;
+    }
+    
+    .training-header .subtitle {
+        color: var(--text-secondary);
+        margin: 0;
+    }
+    
+    /* Table of Contents */
+    .toc-card {
+        margin-bottom: 2rem;
+    }
+    
+    .toc-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 0.75rem;
+    }
+    
+    .toc-link {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem;
+        background: var(--bg-tertiary);
+        border-radius: var(--radius-md);
+        text-decoration: none;
+        color: var(--text-primary);
+        transition: all 0.15s ease;
+    }
+    
+    .toc-link:hover {
+        background: var(--accent-blue);
+        color: white;
+    }
+    
+    .toc-number {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        background: var(--bg-card);
+        border-radius: 50%;
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+    
+    .toc-link:hover .toc-number {
+        background: rgba(255,255,255,0.2);
+    }
+    
+    .toc-text {
+        font-size: 0.9rem;
+    }
+    
+    /* Sections */
+    .training-section {
+        margin-bottom: 3rem;
+        padding-top: 1rem;
+    }
+    
+    .training-section h2 {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid var(--border-color);
+    }
+    
+    .section-icon {
+        font-size: 1.25rem;
+    }
+    
+    /* Concept Cards */
+    .concept-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+    }
+    
+    .concept-card h3 {
+        margin: 0 0 1rem 0;
+        color: var(--accent-blue);
+    }
+    
+    .concept-card ul {
+        margin: 0;
+        padding-left: 1.25rem;
+    }
+    
+    .concept-card li {
+        margin-bottom: 0.5rem;
+    }
+    
+    .concept-item {
+        margin-bottom: 1rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .concept-item:last-child {
+        margin-bottom: 0;
+        padding-bottom: 0;
+        border-bottom: none;
+    }
+    
+    .concept-item h4 {
+        margin: 0 0 0.5rem 0;
+        color: var(--text-primary);
+    }
+    
+    .concept-item p {
+        margin: 0;
+        color: var(--text-secondary);
+    }
+    
+    .highlight-card {
+        background: rgba(99, 102, 241, 0.1);
+        border-color: var(--accent-blue);
+    }
+    
+    .formula {
+        font-size: 1.1rem;
+        text-align: center;
+        padding: 1rem;
+        background: var(--bg-tertiary);
+        border-radius: var(--radius-md);
+        margin: 1rem 0;
+    }
+    
+    /* Feature Lists */
+    .feature-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .feature-item {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        padding: 1.25rem;
+    }
+    
+    .feature-item h4 {
+        margin: 0 0 0.75rem 0;
+        color: var(--accent-blue);
+    }
+    
+    .feature-item p {
+        margin: 0 0 0.5rem 0;
+    }
+    
+    .feature-item ol, .feature-item ul {
+        margin: 0.5rem 0;
+        padding-left: 1.25rem;
+    }
+    
+    .feature-item li {
+        margin-bottom: 0.25rem;
+    }
+    
+    .tip {
+        background: rgba(16, 185, 129, 0.1);
+        border-left: 3px solid var(--accent-green);
+        padding: 0.5rem 0.75rem;
+        margin: 0.75rem 0;
+        border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+        font-size: 0.9rem;
+    }
+    
+    .warning {
+        background: rgba(245, 158, 11, 0.1);
+        border-left: 3px solid var(--accent-yellow);
+        padding: 0.5rem 0.75rem;
+        margin: 0.75rem 0;
+        border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+        font-size: 0.9rem;
+    }
+    
+    /* Screenshot Placeholders */
+    .screenshot-placeholder {
+        background: var(--bg-tertiary);
+        border: 2px dashed var(--border-color);
+        border-radius: var(--radius-md);
+        padding: 2rem;
+        text-align: center;
+        color: var(--text-muted);
+        margin: 1rem 0;
+        font-style: italic;
+    }
+    
+    /* Status Badges */
+    .status-badge {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        border-radius: var(--radius-sm);
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+    
+    .status-active {
+        background: rgba(99, 102, 241, 0.2);
+        color: var(--accent-blue);
+    }
+    
+    .status-complete {
+        background: rgba(16, 185, 129, 0.2);
+        color: var(--accent-green);
+    }
+    
+    /* Workflow Cards */
+    .workflow-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .workflow-card h3 {
+        margin: 0 0 1.25rem 0;
+        color: var(--text-primary);
+    }
+    
+    .workflow-steps {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .workflow-step {
+        display: flex;
+        gap: 1rem;
+        align-items: flex-start;
+    }
+    
+    .step-number {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 32px;
+        height: 32px;
+        background: var(--accent-blue);
+        color: white;
+        border-radius: 50%;
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+    
+    .step-content {
+        flex: 1;
+    }
+    
+    .step-content h4 {
+        margin: 0 0 0.25rem 0;
+        font-size: 1rem;
+    }
+    
+    .step-content p {
+        margin: 0 0 0.25rem 0;
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+    }
+    
+    /* Tips Grid */
+    .tips-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+    
+    .tip-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        padding: 1.25rem;
+        text-align: center;
+    }
+    
+    .tip-icon {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .tip-card h4 {
+        margin: 0 0 0.5rem 0;
+        font-size: 1rem;
+    }
+    
+    .tip-card p {
+        margin: 0;
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+    }
+    
+    /* Footer */
+    .training-footer {
+        text-align: center;
+        padding: 2rem;
+        margin-top: 2rem;
+        border-top: 1px solid var(--border-color);
+    }
+    
+    .training-footer p {
+        color: var(--text-secondary);
+        margin-bottom: 1rem;
+    }
+    
+    /* Print Styles */
+    @@media print {
+        .training-page {
+            max-width: 100%;
+        }
+        
+        .toc-card {
+            page-break-after: always;
+        }
+        
+        .training-section {
+            page-break-inside: avoid;
+        }
+        
+        .screenshot-placeholder {
+            border-style: solid;
+        }
+    }
+</style>

@@ -199,12 +199,33 @@
             <div class="modal-footer">
                 @if (!IsNewProduct)
                 {
-                    <button class="btn btn-danger" style="margin-right: auto;" @onclick="DeleteProduct">🗑️ Delete</button>
+                    <button class="btn btn-danger" style="margin-right: auto;" @onclick="() => ShowDeleteConfirm = true">🗑️ Delete</button>
                 }
                 <button class="btn btn-outline" @onclick="CloseModal">Cancel</button>
                 <button class="btn btn-primary" @onclick="SaveProduct">
                     @(IsNewProduct ? "Add Product" : "Save Changes")
                 </button>
+            </div>
+        </div>
+    </div>
+}
+
+@* Delete Confirmation Modal *@
+@if (ShowDeleteConfirm)
+{
+    <div class="modal-backdrop" @onclick="() => ShowDeleteConfirm = false">
+        <div class="modal" @onclick:stopPropagation="true" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3 class="modal-title">⚠️ Confirm Delete</h3>
+                <button class="modal-close" @onclick="() => ShowDeleteConfirm = false">×</button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete <strong>@DataToUpsert?.Brand @DataToUpsert?.Name</strong>?</p>
+                <p class="text-muted" style="font-size: 0.875rem;">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" @onclick="() => ShowDeleteConfirm = false">Cancel</button>
+                <button class="btn btn-danger" @onclick="DeleteProduct">🗑️ Delete</button>
             </div>
         </div>
     </div>
@@ -234,6 +255,9 @@
     protected bool IsNewProduct = true;
     protected string? FormErrorMessage = null;
     protected ProductsUpsertInput? DataToUpsert { get; set; }
+    
+    // Delete confirmation
+    protected bool ShowDeleteConfirm = false;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -427,11 +451,13 @@
 
         if (output.ReturnValue == ProductsDeleteOutput.Returns.Ok)
         {
+            ShowDeleteConfirm = false;
             LoadData();
             CloseModal();
         }
         else
         {
+            ShowDeleteConfirm = false;
             FormErrorMessage = "Error deleting product.";
         }
     }

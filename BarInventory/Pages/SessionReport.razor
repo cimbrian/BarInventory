@@ -11,24 +11,20 @@
         max-width: 1000px;
         margin: 0 auto;
     }
-
     .report-header {
         border-bottom: 3px solid #333;
         padding-bottom: 1rem;
         margin-bottom: 1.5rem;
     }
-
     .report-title {
         font-size: 1.75rem;
         font-weight: 700;
         margin: 0;
     }
-
     .report-subtitle {
         color: #666;
         margin: 0.25rem 0 0 0;
     }
-
     .report-meta {
         display: flex;
         gap: 2rem;
@@ -36,33 +32,28 @@
         font-size: 0.9rem;
         color: #555;
     }
-
     .stats-grid {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
         gap: 1rem;
         margin-bottom: 2rem;
     }
-
     .stat-box {
         border: 1px solid #ddd;
         border-radius: 8px;
         padding: 1rem;
         text-align: center;
     }
-
     .stat-value {
         font-size: 1.5rem;
         font-weight: 700;
         color: #333;
     }
-
     .stat-label {
         font-size: 0.8rem;
         color: #666;
         text-transform: uppercase;
     }
-
     .section-title {
         font-size: 1.1rem;
         font-weight: 600;
@@ -70,49 +61,33 @@
         padding-bottom: 0.5rem;
         margin: 1.5rem 0 1rem 0;
     }
-
     .data-table {
         width: 100%;
         border-collapse: collapse;
         font-size: 0.85rem;
         margin-bottom: 1.5rem;
     }
-
-        .data-table th {
-            background: #f5f5f5;
-            border: 1px solid #ddd;
-            padding: 0.5rem;
-            text-align: left;
-            font-weight: 600;
-        }
-
-        .data-table td {
-            border: 1px solid #ddd;
-            padding: 0.5rem;
-        }
-
-        .data-table tr:nth-child(even) {
-            background: #fafafa;
-        }
-
-    .text-right {
-        text-align: right;
-    }
-
-    .text-center {
-        text-align: center;
-    }
-
-    .variance-negative {
-        color: #dc3545;
+    .data-table th {
+        background: #f5f5f5;
+        border: 1px solid #ddd;
+        padding: 0.5rem;
+        text-align: left;
         font-weight: 600;
     }
-
-    .variance-positive {
-        color: #28a745;
-        font-weight: 600;
+    .data-table td {
+        border: 1px solid #ddd;
+        padding: 0.5rem;
     }
-
+    .data-table tr:nth-child(even) {
+        background: #fafafa;
+    }
+    .data-table tbody tr:hover {
+        background: #f0f0f0;
+    }
+    .text-right { text-align: right; }
+    .text-center { text-align: center; }
+    .variance-negative { color: #dc3545; font-weight: 600; }
+    .variance-positive { color: #28a745; font-weight: 600; }
     .report-footer {
         border-top: 1px solid #ddd;
         padding-top: 1rem;
@@ -121,13 +96,11 @@
         color: #888;
         text-align: center;
     }
-
     .no-print {
         margin-bottom: 1rem;
         display: flex;
         gap: 0.5rem;
     }
-
     .btn-print {
         background: #4a90d9;
         color: white;
@@ -137,7 +110,6 @@
         cursor: pointer;
         font-size: 0.9rem;
     }
-
     .btn-back {
         background: #6c757d;
         color: white;
@@ -147,51 +119,40 @@
         cursor: pointer;
         font-size: 0.9rem;
     }
-
     .area-grid {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
         gap: 0.75rem;
         margin-bottom: 1.5rem;
     }
-
     .area-box {
         border: 1px solid #ddd;
         border-radius: 6px;
         padding: 0.75rem;
         text-align: center;
     }
-
     .area-name {
         font-weight: 600;
         font-size: 0.85rem;
     }
-
     .area-count {
         font-size: 1.25rem;
         font-weight: 700;
         color: #4a90d9;
     }
-
     @@media print {
-        .no-print {
-            display: none !important;
-        }
-
-        .report-page {
-            padding: 0;
+        .no-print { display: none !important; }
+        .report-page { 
+            padding: 0; 
             max-width: none;
         }
-
-        body {
+        body { 
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
         }
-
         .stat-box, .area-box {
             border: 1px solid #999 !important;
         }
-
         .data-table th {
             background: #eee !important;
         }
@@ -315,9 +276,7 @@ else
                             <strong>@(product?.Name ?? "Unknown")</strong>
                             @if (!string.IsNullOrEmpty(product?.Brand))
                             {
-                                <br />
-
-                                <small style="color: #666;">@product.Brand</small>
+                                <br/><small style="color: #666;">@product.Brand</small>
                             }
                         </td>
                         <td class="text-right">@item.StartingQuantity.ToString("0.0")</td>
@@ -368,43 +327,12 @@ else
 
         <!-- Report Footer -->
         <div class="report-footer">
-            Report generated on @DateTime.Now.ToString("MMMM d, yyyy 'at' h:mm tt") • Bar Inventory System
+            Report generated on @DateTime.Now.ToString("MMMM d, yyyy 'at' h:mm tt") • CzarWare Inventory
         </div>
     </div>
 }
 
 @code {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     [Parameter]
     public int SessionId { get; set; }
 
@@ -438,7 +366,6 @@ else
     private void LoadData()
     {
         IsLoading = true;
-
         try
         {
             // Load session
@@ -448,16 +375,13 @@ else
                 Session = sessionResult?.ResultData;
             }
             if (Session == null) return;
-
             // Load supporting data
             var areasResult = DbService.InventoryAreasQuery(new InventoryAreasQueryInput());
             if (areasResult.ReturnValue == InventoryAreasQueryOutput.Returns.Ok)
                 Areas = areasResult?.ResultData ?? new();
-
             var productsResult = DbService.ProductsQuery(new ProductsQueryInput());
             if (productsResult.ReturnValue == ProductsQueryOutput.Returns.Ok)
                 Products = productsResult?.ResultData ?? new();
-
             var categoriesResult = DbService.ProductCategoriesQuery(new ProductCategoriesQueryInput());
             if (categoriesResult.ReturnValue == ProductCategoriesQueryOutput.Returns.Ok)
                 if (categoriesResult.ResultData is not null)
@@ -466,7 +390,6 @@ else
                         CategoryNames[c.Id] = c.Name;
                 }
             var lossTypesResult = DbService.LossTypesQuery(new LossTypesQueryInput());
-
             if (lossTypesResult.ReturnValue == LossTypesQueryOutput.Returns.Ok)
             {
                 if (lossTypesResult.ResultData is not null)
@@ -479,11 +402,9 @@ else
             var itemsResult = DbService.InventoryItemsQuery(new InventoryItemsQueryInput { SessionId = SessionId });
             if (itemsResult.ReturnValue == InventoryItemsQueryOutput.Returns.Ok)
                 SessionItems = itemsResult?.ResultData ?? new();
-
             var lossesResult = DbService.LossRecordsQuery(new LossRecordsQueryInput { SessionId = SessionId });
             if (lossesResult.ReturnValue == LossRecordsQueryOutput.Returns.Ok)
                 SessionLosses = lossesResult?.ResultData ?? new();
-
             // Load area counts for all items
             AllAreaCounts.Clear();
             foreach (var item in SessionItems)
@@ -495,7 +416,6 @@ else
                     AllAreaCounts.AddRange(countsResult.ResultData);
                 }
             }
-
             // Calculate totals
             CalculateTotals();
         }

@@ -52,6 +52,10 @@
                             <td @onclick:stopPropagation="true">
                                 <button class="btn btn-ghost btn-sm" @onclick="() => EditSession(session)" title="Edit">✏️</button>
                                 <button class="btn btn-ghost btn-sm" @onclick="() => OpenSessionSummary(session)" title="View Summary">📊</button>
+                                @if (!session.IsComplete)
+                                {
+                                    <button class="btn btn-ghost btn-sm" @onclick="() => ConfirmCompleteSession(session)" title="Complete Session">✅</button>
+                                }
                             </td>
                             <td>
                                 <div style="font-weight: 500;">@session.SessionName</div>
@@ -154,12 +158,99 @@
             <div class="modal-footer">
                 @if (!IsNewSession)
                 {
-                    <button class="btn btn-danger" style="margin-right: auto;" @onclick="DeleteSession">🗑️ Delete</button>
+                    <button class="btn btn-danger" style="margin-right: auto;" @onclick="() => ShowDeleteConfirm = true">🗑️ Delete</button>
                 }
                 <button class="btn btn-outline" @onclick="CloseModal">Cancel</button>
                 <button class="btn btn-primary" @onclick="SaveSession">
                     @(IsNewSession ? "Create Session" : "Save Changes")
                 </button>
+            </div>
+        </div>
+    </div>
+}
+
+@* Delete Confirmation Modal *@
+@if (ShowDeleteConfirm)
+{
+    <div class="modal-backdrop" @onclick="() => ShowDeleteConfirm = false">
+        <div class="modal" @onclick:stopPropagation="true" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3 class="modal-title">⚠️ Confirm Delete</h3>
+                <button class="modal-close" @onclick="() => ShowDeleteConfirm = false">×</button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete <strong>@DataToUpsert?.SessionName</strong>?</p>
+                <p class="text-muted" style="font-size: 0.875rem;">This will also delete all inventory items and counts for this session. This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" @onclick="() => ShowDeleteConfirm = false">Cancel</button>
+                <button class="btn btn-danger" @onclick="DeleteSession">🗑️ Delete</button>
+            </div>
+        </div>
+    </div>
+}
+
+@* Complete Session Confirmation Modal *@
+@if (ShowCompleteConfirm && SessionToComplete != null)
+{
+    <div class="modal-backdrop" @onclick="() => ShowCompleteConfirm = false">
+        <div class="modal" @onclick:stopPropagation="true" style="max-width: 450px;">
+            <div class="modal-header">
+                <h3 class="modal-title">✅ Complete Session</h3>
+                <button class="modal-close" @onclick="() => ShowCompleteConfirm = false">×</button>
+            </div>
+            <div class="modal-body">
+                <p>Mark <strong>@SessionToComplete.SessionName</strong> as complete?</p>
+                <p class="text-muted" style="font-size: 0.875rem;">
+                    This will finalize the session counts. The ending quantities will be used as starting quantities for the next session.
+                </p>
+                @{
+                    var itemCount = GetSessionItemCount(SessionToComplete.Id);
+                    var countedCount = GetSessionCountedItemCount(SessionToComplete.Id);
+                }
+                <div style="background: var(--bg-tertiary); padding: 0.75rem; border-radius: var(--radius-md); margin-top: 0.75rem;">
+                    <div class="d-flex justify-between">
+                        <span>Items Counted:</span>
+                        <strong>@countedCount / @itemCount</strong>
+                    </div>
+                    @if (countedCount < itemCount)
+                    {
+                        <div class="text-muted" style="font-size: 0.8rem; margin-top: 0.5rem;">
+                            ⚠️ @(itemCount - countedCount) items have not been counted yet
+                        </div>
+                    }
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" @onclick="() => ShowCompleteConfirm = false">Cancel</button>
+                <button class="btn btn-primary" @onclick="CompleteSession">✅ Complete Session</button>
+            </div>
+        </div>
+    </div>
+}
+
+@* Active Session Warning Modal *@
+@if (ShowActiveSessionWarning && ActiveSessionWarning != null)
+{
+    <div class="modal-backdrop" @onclick="() => ShowActiveSessionWarning = false">
+        <div class="modal" @onclick:stopPropagation="true" style="max-width: 450px;">
+            <div class="modal-header">
+                <h3 class="modal-title">⚠️ Active Session Exists</h3>
+                <button class="modal-close" @onclick="() => ShowActiveSessionWarning = false">×</button>
+            </div>
+            <div class="modal-body">
+                <p>There is already an active session in progress:</p>
+                <div style="background: var(--bg-tertiary); padding: 0.75rem; border-radius: var(--radius-md); margin: 0.75rem 0;">
+                    <div style="font-weight: 600;">@ActiveSessionWarning.SessionName</div>
+                    <div class="text-muted" style="font-size: 0.85rem;">Started @ActiveSessionWarning.SessionDate.ToString("MMM dd, yyyy")</div>
+                </div>
+                <p class="text-muted" style="font-size: 0.875rem;">
+                    Please complete or delete the existing session before starting a new one.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" @onclick="() => ShowActiveSessionWarning = false">Close</button>
+                <button class="btn btn-primary" @onclick="GoToCapture">📋 Go to Capture</button>
             </div>
         </div>
     </div>
@@ -476,6 +567,15 @@
     protected bool IsNewSession = true;
     protected string? FormErrorMessage = null;
     protected InventorySessionsUpsertInput? DataToUpsert { get; set; }
+    protected bool ShowDeleteConfirm = false;
+    
+    // Complete Session State
+    protected bool ShowCompleteConfirm = false;
+    protected InventorySessionsQueryResult? SessionToComplete = null;
+
+    // Active Session Warning State
+    protected bool ShowActiveSessionWarning = false;
+    protected InventorySessionsQueryResult? ActiveSessionWarning = null;
 
     // Summary Modal State
     protected bool ShowSummaryModal = false;
@@ -599,6 +699,15 @@
 
     protected void OpenAddSession()
     {
+        // Check if there's already an active session
+        var activeSession = SessionList?.FirstOrDefault(s => !s.IsComplete);
+        if (activeSession != null)
+        {
+            ActiveSessionWarning = activeSession;
+            ShowActiveSessionWarning = true;
+            return;
+        }
+        
         IsNewSession = true;
         FormErrorMessage = null;
         DataToUpsert = new InventorySessionsUpsertInput
@@ -613,6 +722,12 @@
             CountedBy = ""
         };
         ShowSessionModal = true;
+    }
+
+    protected void GoToCapture()
+    {
+        ShowActiveSessionWarning = false;
+        NavigationManager.NavigateTo("/capture");
     }
 
     protected int GetWeekNumber(DateTime date)
@@ -716,9 +831,16 @@
             return;
         }
 
+        var isNew = IsNewSession;
         var output = DbService.InventorySessionsUpsert(DataToUpsert);
         if (output.ReturnValue == InventorySessionsUpsertOutput.Returns.Ok)
         {
+            // If this is a NEW session, create inventory items for all active products
+            if (isNew && output.Id.HasValue)
+            {
+                CreateInventoryItemsForSession(output.Id.Value);
+            }
+            
             LoadData();
             CloseModal();
         }
@@ -726,6 +848,81 @@
         {
             FormErrorMessage = "Error saving session.";
         }
+    }
+    
+    protected void CreateInventoryItemsForSession(int sessionId)
+    {
+        // Get all active products
+        var productsOutput = DbService.ProductsQuery(new ProductsQueryInput { IsActive = true });
+        if (productsOutput.ReturnValue != ProductsQueryOutput.Returns.Ok || productsOutput.ResultData == null)
+            return;
+        
+        // Get prior session's ending counts to use as starting quantities
+        var priorEndingCounts = GetPriorSessionEndingCounts();
+        
+        // Create an inventory item for each product
+        foreach (var product in productsOutput.ResultData)
+        {
+            // Use prior session's ending count as starting quantity, or 0 if none
+            decimal startingQty = priorEndingCounts.GetValueOrDefault(product.Id, 0);
+            
+            var itemInput = new InventoryItemsUpsertInput
+            {
+                SessionId = sessionId,
+                ProductId = product.Id,
+                StartingQuantity = startingQty,
+                ReceivedQuantity = 0,
+                LastCountedAt = null
+            };
+            
+            if (itemInput.IsValid())
+            {
+                DbService.InventoryItemsUpsert(itemInput);
+            }
+        }
+    }
+    
+    protected Dictionary<int, decimal> GetPriorSessionEndingCounts()
+    {
+        var result = new Dictionary<int, decimal>();
+        
+        // Find the most recent completed session
+        var sessionsOutput = DbService.InventorySessionsQuery(new InventorySessionsQueryInput());
+        if (sessionsOutput.ReturnValue != InventorySessionsQueryOutput.Returns.Ok || sessionsOutput.ResultData == null)
+            return result;
+        
+        var priorSession = sessionsOutput.ResultData
+            .Where(s => s.IsComplete)
+            .OrderByDescending(s => s.SessionDate)
+            .FirstOrDefault();
+        
+        if (priorSession == null)
+            return result; // No prior session, all starting quantities will be 0
+        
+        // Get inventory items from prior session
+        var itemsOutput = DbService.InventoryItemsQuery(new InventoryItemsQueryInput());
+        if (itemsOutput.ReturnValue != InventoryItemsQueryOutput.Returns.Ok || itemsOutput.ResultData == null)
+            return result;
+        
+        var priorItems = itemsOutput.ResultData.Where(i => i.SessionId == priorSession.Id).ToList();
+        
+        // Get area counts for prior session items
+        var countsOutput = DbService.AreaCountsQuery(new AreaCountsQueryInput());
+        if (countsOutput.ReturnValue != AreaCountsQueryOutput.Returns.Ok || countsOutput.ResultData == null)
+            return result;
+        
+        var priorItemIds = priorItems.Select(i => i.Id).ToHashSet();
+        var priorCounts = countsOutput.ResultData.Where(c => priorItemIds.Contains(c.InventoryItemId)).ToList();
+        
+        // Calculate ending quantity for each product (sum of area counts)
+        foreach (var item in priorItems)
+        {
+            var itemCounts = priorCounts.Where(c => c.InventoryItemId == item.Id);
+            decimal totalCount = itemCounts.Sum(c => c.FullUnits + (c.HasPartial ? c.PartialAmount / 10m : 0));
+            result[item.ProductId] = totalCount;
+        }
+        
+        return result;
     }
 
     protected void DeleteSession()
@@ -737,13 +934,70 @@
 
         if (output.ReturnValue == InventorySessionsDeleteOutput.Returns.Ok)
         {
+            ShowDeleteConfirm = false;
             LoadData();
             CloseModal();
         }
         else
         {
+            ShowDeleteConfirm = false;
             FormErrorMessage = "Error deleting session. It may have inventory items attached.";
         }
+    }
+
+    protected void ConfirmCompleteSession(InventorySessionsQueryResult session)
+    {
+        SessionToComplete = session;
+        ShowCompleteConfirm = true;
+    }
+
+    protected void CompleteSession()
+    {
+        if (SessionToComplete == null) return;
+
+        var input = new InventorySessionsUpsertInput
+        {
+            Id = SessionToComplete.Id,
+            SessionName = SessionToComplete.SessionName,
+            SessionDate = SessionToComplete.SessionDate,
+            Frequency = SessionToComplete.Frequency,
+            CountedBy = SessionToComplete.CountedBy,
+            Notes = SessionToComplete.Notes,
+            IsComplete = true,
+            CompletedAt = DateTime.Now
+        };
+
+        if (input.IsValid())
+        {
+            var output = DbService.InventorySessionsUpsert(input);
+            if (output.ReturnValue == InventorySessionsUpsertOutput.Returns.Ok)
+            {
+                LoadData();
+            }
+        }
+
+        ShowCompleteConfirm = false;
+        SessionToComplete = null;
+    }
+
+    protected int GetSessionCountedItemCount(int sessionId)
+    {
+        if (AllItems == null) return 0;
+        var sessionItems = AllItems.Where(i => i.SessionId == sessionId).ToList();
+        var sessionItemIds = sessionItems.Select(i => i.Id).ToHashSet();
+        
+        // Count items that have either: area counts > 0, received quantity > 0, or LastCountedAt set
+        int counted = 0;
+        foreach (var item in sessionItems)
+        {
+            bool hasCounts = AllAreaCounts?.Any(ac => ac.InventoryItemId == item.Id && (ac.FullUnits > 0 || ac.PartialAmount > 0)) ?? false;
+            bool hasReceived = item.ReceivedQuantity > 0;
+            bool wasMarkedCounted = item.LastCountedAt != null;
+            
+            if (hasCounts || hasReceived || wasMarkedCounted)
+                counted++;
+        }
+        return counted;
     }
 
     protected string GetFrequencyName(int frequencyId)

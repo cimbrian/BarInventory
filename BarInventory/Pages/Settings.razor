@@ -22,6 +22,9 @@
     <button class='settings-tab @(ActiveTab == "frequencies" ? "active" : "")' @onclick='() => ActiveTab = "frequencies"'>
         🔄 Frequencies
     </button>
+    <button class='settings-tab @(ActiveTab == "areas" ? "active" : "")' @onclick='() => ActiveTab = "areas"'>
+        📍 Inventory Areas
+    </button>
 </div>
 
 @* Product Categories *@
@@ -62,7 +65,7 @@
                             </td>
                             <td>
                                 <button class="btn btn-ghost btn-sm" @onclick="() => EditCategory(cat)">✏️</button>
-                                <button class="btn btn-ghost btn-sm" @onclick="() => DeleteCategory(cat.Id)">🗑️</button>
+                                <button class="btn btn-ghost btn-sm" @onclick="() => ConfirmDeleteCategory(cat)">🗑️</button>
                             </td>
                         </tr>
                     }
@@ -110,7 +113,7 @@
                             </td>
                             <td>
                                 <button class="btn btn-ghost btn-sm" @onclick="() => EditContainer(ct)">✏️</button>
-                                <button class="btn btn-ghost btn-sm" @onclick="() => DeleteContainer(ct.Id)">🗑️</button>
+                                <button class="btn btn-ghost btn-sm" @onclick="() => ConfirmDeleteContainer(ct)">🗑️</button>
                             </td>
                         </tr>
                     }
@@ -158,7 +161,7 @@
                             </td>
                             <td>
                                 <button class="btn btn-ghost btn-sm" @onclick="() => EditLossType(lt)">✏️</button>
-                                <button class="btn btn-ghost btn-sm" @onclick="() => DeleteLossType(lt.Id)">🗑️</button>
+                                <button class="btn btn-ghost btn-sm" @onclick="() => ConfirmDeleteLossType(lt)">🗑️</button>
                             </td>
                         </tr>
                     }
@@ -206,7 +209,57 @@
                             </td>
                             <td>
                                 <button class="btn btn-ghost btn-sm" @onclick="() => EditFrequency(freq)">✏️</button>
-                                <button class="btn btn-ghost btn-sm" @onclick="() => DeleteFrequency(freq.Id)">🗑️</button>
+                                <button class="btn btn-ghost btn-sm" @onclick="() => ConfirmDeleteFrequency(freq)">🗑️</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@* Inventory Areas *@
+@if (ActiveTab == "areas")
+{
+    <div class="card">
+        <div class="card-header d-flex justify-between align-center">
+            <h3 class="card-title">📍 Inventory Areas</h3>
+            <button class="btn btn-primary btn-sm" @onclick="AddArea">➕ Add Area</button>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">ID</th>
+                        <th>Name</th>
+                        <th>ShortCode</th>
+                        <th class="number">Sort Order</th>
+                        <th>Status</th>
+                        <th style="width: 100px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var area in Areas.OrderBy(a => a.SortOrder))
+                    {
+                        <tr>
+                            <td class="text-muted">@area.Id</td>
+                            <td><strong>@area.Name</strong></td>
+                            <td><strong>@area.ShortCode</strong></td>
+                            <td class="number">@area.SortOrder</td>
+                            <td>
+                                @if (area.IsActive)
+                                {
+                                    <span class="item-badge badge-success">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="item-badge badge-muted">Inactive</span>
+                                }
+                            </td>
+                            <td>
+                                <button class="btn btn-ghost btn-sm" @onclick="() => EditArea(area)">✏️</button>
+                                <button class="btn btn-ghost btn-sm" @onclick="() => ConfirmDeleteArea(area)">🗑️</button>
                             </td>
                         </tr>
                     }
@@ -228,19 +281,27 @@
             <div class="modal-body">
                 @if (!string.IsNullOrEmpty(EditErrorMessage))
                 {
-                    <div class="alert alert-danger mb-md">@EditErrorMessage</div>
+                    <div class="alert alert-danger mb-md">@((MarkupString)EditErrorMessage)</div>
                 }
-                
+
                 <div class="form-group">
                     <label class="form-label">Name</label>
                     <input type="text" class="form-control" @bind="EditName" placeholder="Enter name..." />
                 </div>
-                
+
+                @if (EditType.Equals("area"))
+                {
+                    <div class="form-group">
+                        <label class="form-label">Abbreviation</label>
+                        <input type="text" class="form-control" @bind="EditShortCode" placeholder="Enter short name for this..." />
+                    </div>
+                }
+
                 <div class="form-group">
                     <label class="form-label">Sort Order</label>
                     <input type="number" class="form-control" @bind="EditSortOrder" min="0" />
                 </div>
-                
+
                 <div class="form-group">
                     <label class="form-label">
                         <input type="checkbox" @bind="EditIsActive" /> Active
@@ -255,6 +316,27 @@
     </div>
 }
 
+@* Delete Confirmation Modal *@
+@if (ShowDeleteConfirm)
+{
+    <div class="modal-backdrop" @onclick="CancelDelete">
+        <div class="modal" @onclick:stopPropagation="true" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3 class="modal-title">⚠️ Confirm Delete</h3>
+                <button class="modal-close" @onclick="CancelDelete">×</button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete <strong>@DeleteItemName</strong>?</p>
+                <p class="text-muted" style="font-size: 0.875rem;">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" @onclick="CancelDelete">Cancel</button>
+                <button class="btn btn-danger" @onclick="ConfirmDeleteAction">🗑️ Delete</button>
+            </div>
+        </div>
+    </div>
+}
+
 <style>
     .settings-tabs {
         display: flex;
@@ -264,7 +346,7 @@
         background: var(--bg-tertiary);
         border-radius: var(--radius-md);
     }
-    
+
     .settings-tab {
         padding: 0.75rem 1.25rem;
         border: none;
@@ -275,17 +357,17 @@
         font-size: 0.95rem;
         transition: all 0.15s ease;
     }
-    
-    .settings-tab:hover {
-        background: var(--bg-card);
-        color: var(--text-primary);
-    }
-    
-    .settings-tab.active {
-        background: var(--accent-blue);
-        color: white;
-    }
-    
+
+        .settings-tab:hover {
+            background: var(--bg-card);
+            color: var(--text-primary);
+        }
+
+        .settings-tab.active {
+            background: var(--accent-blue);
+            color: white;
+        }
+
     .badge-muted {
         background: var(--bg-tertiary);
         color: var(--text-secondary);
@@ -293,25 +375,36 @@
 </style>
 
 @code {
+
+
+
     [Inject] private BarInventory.BarDB.Service DbService { get; set; } = default!;
 
     private string ActiveTab = "categories";
-    
+
     // Data lists
     private List<ProductCategoriesQueryResult> Categories = new();
     private List<ContainerTypesQueryResult> ContainerTypes = new();
     private List<LossTypesQueryResult> LossTypes = new();
     private List<InventoryFrequenciesQueryResult> Frequencies = new();
-    
+    private List<InventoryAreasQueryResult> Areas = new();
+
     // Edit modal state
     private bool ShowEditModal = false;
     private string EditModalTitle = "";
     private string EditErrorMessage = "";
-    private string EditType = ""; // "category", "container", "losstype", "frequency"
+    private string EditType = ""; // "category", "container", "losstype", "frequency", "area"
+    private string EditShortCode = "";
     private int EditId = 0;
     private string EditName = "";
     private int EditSortOrder = 0;
     private bool EditIsActive = true;
+
+    // Delete confirmation state
+    private bool ShowDeleteConfirm = false;
+    private string DeleteType = "";
+    private int DeleteId = 0;
+    private string DeleteItemName = "";
 
     protected override void OnInitialized()
     {
@@ -326,26 +419,33 @@
         {
             Categories = catOutput.ResultData ?? new();
         }
-        
+
         // Load Container Types
         var ctOutput = DbService.ContainerTypesQuery(new ContainerTypesQueryInput());
         if (ctOutput.ReturnValue == ContainerTypesQueryOutput.Returns.Ok)
         {
             ContainerTypes = ctOutput.ResultData ?? new();
         }
-        
+
         // Load Loss Types
         var ltOutput = DbService.LossTypesQuery(new LossTypesQueryInput());
         if (ltOutput.ReturnValue == LossTypesQueryOutput.Returns.Ok)
         {
             LossTypes = ltOutput.ResultData ?? new();
         }
-        
+
         // Load Frequencies
         var freqOutput = DbService.InventoryFrequenciesQuery(new InventoryFrequenciesQueryInput());
         if (freqOutput.ReturnValue == InventoryFrequenciesQueryOutput.Returns.Ok)
         {
             Frequencies = freqOutput.ResultData ?? new();
+        }
+
+        // Load Areas
+        var areasOutput = DbService.InventoryAreasQuery(new InventoryAreasQueryInput());
+        if (areasOutput.ReturnValue == InventoryAreasQueryOutput.Returns.Ok)
+        {
+            Areas = areasOutput.ResultData ?? new();
         }
     }
 
@@ -485,6 +585,114 @@
         }
     }
 
+    // Area methods
+    private void AddArea()
+    {
+        EditType = "area";
+        EditId = 0;
+        EditName = "";
+        EditShortCode = "";
+        EditSortOrder = Areas.Count > 0 ? Areas.Max(a => a.SortOrder) + 1 : 1;
+        EditIsActive = true;
+        EditModalTitle = "Add Inventory Area";
+        EditErrorMessage = "";
+        ShowEditModal = true;
+    }
+
+    private void EditArea(InventoryAreasQueryResult area)
+    {
+        EditType = "area";
+        EditId = area.Id;
+        EditName = area.Name;
+        EditShortCode = area.ShortCode;
+        EditSortOrder = area.SortOrder;
+        EditIsActive = area.IsActive;
+        EditModalTitle = "Edit Inventory Area";
+        EditErrorMessage = "";
+        ShowEditModal = true;
+    }
+
+    private void DeleteArea(int id)
+    {
+        var output = DbService.InventoryAreasDelete(new InventoryAreasDeleteInput { Id = id });
+        if (output.ReturnValue == InventoryAreasDeleteOutput.Returns.Ok)
+        {
+            LoadAllData();
+        }
+    }
+
+    // Delete confirmation methods
+    private void ConfirmDeleteCategory(ProductCategoriesQueryResult cat)
+    {
+        DeleteType = "category";
+        DeleteId = cat.Id;
+        DeleteItemName = cat.Name;
+        ShowDeleteConfirm = true;
+    }
+
+    private void ConfirmDeleteContainer(ContainerTypesQueryResult ct)
+    {
+        DeleteType = "container";
+        DeleteId = ct.Id;
+        DeleteItemName = ct.Name;
+        ShowDeleteConfirm = true;
+    }
+
+    private void ConfirmDeleteLossType(LossTypesQueryResult lt)
+    {
+        DeleteType = "losstype";
+        DeleteId = lt.Id;
+        DeleteItemName = lt.Name;
+        ShowDeleteConfirm = true;
+    }
+
+    private void ConfirmDeleteFrequency(InventoryFrequenciesQueryResult freq)
+    {
+        DeleteType = "frequency";
+        DeleteId = freq.Id;
+        DeleteItemName = freq.Name;
+        ShowDeleteConfirm = true;
+    }
+
+    private void ConfirmDeleteArea(InventoryAreasQueryResult area)
+    {
+        DeleteType = "area";
+        DeleteId = area.Id;
+        DeleteItemName = area.Name;
+        ShowDeleteConfirm = true;
+    }
+
+    private void CancelDelete()
+    {
+        ShowDeleteConfirm = false;
+        DeleteType = "";
+        DeleteId = 0;
+        DeleteItemName = "";
+    }
+
+    private void ConfirmDeleteAction()
+    {
+        switch (DeleteType)
+        {
+            case "category":
+                DeleteCategory(DeleteId);
+                break;
+            case "container":
+                DeleteContainer(DeleteId);
+                break;
+            case "losstype":
+                DeleteLossType(DeleteId);
+                break;
+            case "frequency":
+                DeleteFrequency(DeleteId);
+                break;
+            case "area":
+                DeleteArea(DeleteId);
+                break;
+        }
+        CancelDelete();
+    }
+
     // Modal methods
     private void CloseEditModal()
     {
@@ -501,55 +709,99 @@
         }
 
         bool success = false;
+        EditErrorMessage = "";
 
         switch (EditType)
         {
             case "category":
                 var catInput = new ProductCategoriesUpsertInput
+                    {
+                        Id = EditId > 0 ? EditId : null,
+                        Name = EditName,
+                        SortOrder = EditSortOrder,
+                        IsActive = EditIsActive
+                    };
+                if (!catInput.IsValid())
                 {
-                    Id = EditId > 0 ? EditId : null,
-                    Name = EditName,
-                    SortOrder = EditSortOrder,
-                    IsActive = EditIsActive
-                };
+                    EditErrorMessage = string.Join("<br/>", catInput.ValidationResults.Select(v => v));
+                    return;
+                }
                 var catOutput = DbService.ProductCategoriesUpsert(catInput);
                 success = catOutput.ReturnValue == ProductCategoriesUpsertOutput.Returns.Ok;
+                if (!success) EditErrorMessage = $"Save failed: {catOutput.ReturnValue}";
                 break;
 
             case "container":
                 var ctInput = new ContainerTypesUpsertInput
+                    {
+                        Id = EditId > 0 ? EditId : null,
+                        Name = EditName,
+                        SortOrder = EditSortOrder,
+                        IsActive = EditIsActive
+                    };
+                if (!ctInput.IsValid())
                 {
-                    Id = EditId > 0 ? EditId : null,
-                    Name = EditName,
-                    SortOrder = EditSortOrder,
-                    IsActive = EditIsActive
-                };
+                    EditErrorMessage = string.Join("<br/>", ctInput.ValidationResults.Select(v => v));
+                    return;
+                }
                 var ctOutput = DbService.ContainerTypesUpsert(ctInput);
                 success = ctOutput.ReturnValue == ContainerTypesUpsertOutput.Returns.Ok;
+                if (!success) EditErrorMessage = $"Save failed: {ctOutput.ReturnValue}";
                 break;
 
             case "losstype":
                 var ltInput = new LossTypesUpsertInput
+                    {
+                        Id = EditId > 0 ? EditId : null,
+                        Name = EditName,
+                        SortOrder = EditSortOrder,
+                        IsActive = EditIsActive
+                    };
+                if (!ltInput.IsValid())
                 {
-                    Id = EditId > 0 ? EditId : null,
-                    Name = EditName,
-                    SortOrder = EditSortOrder,
-                    IsActive = EditIsActive
-                };
+                    EditErrorMessage = string.Join("<br/>", ltInput.ValidationResults.Select(v => v));
+                    return;
+                }
                 var ltOutput = DbService.LossTypesUpsert(ltInput);
                 success = ltOutput.ReturnValue == LossTypesUpsertOutput.Returns.Ok;
+                if (!success) EditErrorMessage = $"Save failed: {ltOutput.ReturnValue}";
                 break;
 
             case "frequency":
                 var freqInput = new InventoryFrequenciesUpsertInput
+                    {
+                        Id = EditId > 0 ? EditId : null,
+                        Name = EditName,
+                        SortOrder = EditSortOrder,
+                        IsActive = EditIsActive
+                    };
+                if (!freqInput.IsValid())
                 {
-                    Id = EditId > 0 ? EditId : null,
-                    Name = EditName,
-                    SortOrder = EditSortOrder,
-                    IsActive = EditIsActive
-                };
+                    EditErrorMessage = string.Join("<br/>", freqInput.ValidationResults.Select(v => v));
+                    return;
+                }
                 var freqOutput = DbService.InventoryFrequenciesUpsert(freqInput);
                 success = freqOutput.ReturnValue == InventoryFrequenciesUpsertOutput.Returns.Ok;
+                if (!success) EditErrorMessage = $"Save failed: {freqOutput.ReturnValue}";
+                break;
+
+            case "area":
+                var areaInput = new InventoryAreasUpsertInput
+                    {
+                        Id = EditId > 0 ? EditId : null,
+                        Name = EditName,
+                        ShortCode = EditShortCode,
+                        SortOrder = EditSortOrder,
+                        IsActive = EditIsActive
+                    };
+                if (!areaInput.IsValid())
+                {
+                    EditErrorMessage = string.Join("<br/>", areaInput.ValidationResults.Select(v => v));
+                    return;
+                }
+                var areaOutput = DbService.InventoryAreasUpsert(areaInput);
+                success = areaOutput.ReturnValue == InventoryAreasUpsertOutput.Returns.Ok;
+                if (!success) EditErrorMessage = $"Save failed: {areaOutput.ReturnValue}";
                 break;
         }
 
@@ -557,10 +809,6 @@
         {
             LoadAllData();
             CloseEditModal();
-        }
-        else
-        {
-            EditErrorMessage = "Error saving. Please try again.";
         }
     }
 }

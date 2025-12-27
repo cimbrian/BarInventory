@@ -32,6 +32,17 @@
 }
 else
 {
+    @* Error Message Display *@
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="alert alert-error mb-md" style="background: rgba(220, 53, 69, 0.15); border: 1px solid var(--accent-red); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1rem;">
+            <div class="d-flex justify-between align-center">
+                <span style="color: var(--accent-red);">⚠️ @((MarkupString)_errorMessage)</span>
+                <button class="btn btn-ghost btn-sm" @onclick='() => _errorMessage = ""'>✕</button>
+            </div>
+        </div>
+    }
+    
     @* Area Tabs *@
     <div class="area-tabs">
         <button class='area-tab @(_selectedAreaId == null ? "active" : "")' @onclick="() => SelectArea(null)">
@@ -68,6 +79,21 @@ else
         </button>
     </div>
     
+    @* Category Filter *@
+    <div class="category-filter-bar mb-md">
+        <button class='category-tab @(_selectedCategoryId == null ? "active" : "")' 
+                @onclick="() => _selectedCategoryId = null">
+            All (@GetCategoryCount(null))
+        </button>
+        @foreach (var cat in GetActiveCategories())
+        {
+            <button class='category-tab @(_selectedCategoryId == cat.Id ? "active" : "")' 
+                    @onclick="() => _selectedCategoryId = cat.Id">
+                @GetCategoryIcon(cat.Id) @cat.Name (@GetCategoryCount(cat.Id))
+            </button>
+        }
+    </div>
+    
     @* Product List *@
     <div class="card">
         <div class="card-body" style="padding: 0;">
@@ -76,6 +102,10 @@ else
                     <tr>
                         <th>PRODUCT</th>
                         <th class="number">COUNT</th>
+                        @if (_selectedAreaId.HasValue)
+                        {
+                            <th style="width: 60px;"></th>
+                        }
                     </tr>
                 </thead>
                 <tbody>
@@ -101,7 +131,12 @@ else
                                     <div class="count-cell">
                                         <div class="count-controls-inline">
                                             <button type="button" class="count-btn-sm" @onclick="() => DecrementCount(item, _selectedAreaId.Value)">−</button>
-                                            <span class="count-value-sm">@(((areaCount?.FullUnits ?? 0) + (areaCount?.HasPartial == true ? areaCount.PartialAmount / 10m : 0)).ToString("0.0"))</span>
+                                            <input type="number" 
+                                                   class="count-input-sm" 
+                                                   value="@(areaCount?.FullUnits ?? 0)"
+                                                   min="0"
+                                                   step="1"
+                                                   @onchange="(e) => SetCount(item, _selectedAreaId.Value, e)" />
                                             <button type="button" class="count-btn-sm" @onclick="() => IncrementCount(item, _selectedAreaId.Value)">+</button>
                                         </div>
                                         @if (ShouldShowPartial(product?.Category ?? 0))
@@ -123,6 +158,27 @@ else
                                     </div>
                                 }
                             </td>
+                            @if (_selectedAreaId.HasValue)
+                            {
+                                @* Done button for filtered area view *@
+                                <td style="width: 60px; text-align: center;">
+                                    @if (!isCounted)
+                                    {
+                                            var areaCount = GetAreaCount(item.Id, _selectedAreaId.Value);
+                                            var hasAreaData = (areaCount?.FullUnits ?? 0) > 0 || (areaCount?.PartialAmount ?? 0) > 0;
+                                        <button type="button" 
+                                                class='btn btn-xs @(hasAreaData ? "btn-success" : "btn-ghost")'
+                                                @onclick="() => MarkItemCounted(item)"
+                                                title="Mark as done">
+                                            ✓
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-success">✓</span>
+                                    }
+                                </td>
+                            }
                         </tr>
                         
                         @* Expanded Area Counts *@
@@ -138,7 +194,12 @@ else
                                                 <div class="area-name">@area.Name</div>
                                                 <div class="count-controls-inline">
                                                     <button type="button" class="count-btn-sm" @onclick="() => DecrementCount(item, area.Id)">−</button>
-                                                    <span class="count-value-sm">@(((areaCount?.FullUnits ?? 0) + (areaCount?.HasPartial == true ? areaCount.PartialAmount / 10m : 0)).ToString("0.0"))</span>
+                                                    <input type="number" 
+                                                           class="count-input-sm" 
+                                                           value="@(areaCount?.FullUnits ?? 0)"
+                                                           min="0"
+                                                           step="1"
+                                                           @onchange="(e) => SetCount(item, area.Id, e)" />
                                                     <button type="button" class="count-btn-sm" @onclick="() => IncrementCount(item, area.Id)">+</button>
                                                 </div>
                                             @if (ShouldShowPartial(product?.Category ?? 0))
@@ -168,6 +229,17 @@ else
                                                value="@item.ReceivedQuantity"
                                                @onchange="@(e => UpdateReceived(item, e))" />
                                     </div>
+                                    
+                                    @* Done Button *@
+                                    <div class="d-flex justify-end mt-md">
+                                        @{
+                                            var hasData = HasCountsOrReceived(item);
+                                        }
+                                        <button class='btn @(hasData ? "btn-success" : "btn-outline")'
+                                                @onclick="() => MarkItemDone(item)">
+                                            ✓ Done
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         }
@@ -188,9 +260,55 @@ else
     
     @* Session Actions *@
     <div class="d-flex gap-md mt-lg" style="justify-content: center;">
-        <button class="btn btn-success btn-lg" @onclick="CompleteSession">
+        <button class="btn btn-success btn-lg" @onclick="ShowCompleteConfirmation">
             ✓ Complete Session
         </button>
+    </div>
+}
+
+@* Complete Session Confirmation Modal *@
+@if (_showCompleteConfirm && _currentSession != null)
+{
+    <div class="modal-backdrop" @onclick="() => _showCompleteConfirm = false">
+        <div class="modal" @onclick:stopPropagation="true" style="max-width: 450px;">
+            <div class="modal-header">
+                <h3 class="modal-title">✅ Complete Session</h3>
+                <button class="modal-close" @onclick="() => _showCompleteConfirm = false">×</button>
+            </div>
+            <div class="modal-body">
+                <p>Ready to complete <strong>@_currentSession.SessionName</strong>?</p>
+                <p class="text-muted" style="font-size: 0.875rem;">
+                    This will finalize the session. The ending quantities will become starting quantities for the next session.
+                </p>
+                @{
+                    var totalItems = _items.Count;
+                    var countedItems = _items.Count(i => HasBeenCounted(i));
+                    var uncountedItems = totalItems - countedItems;
+                }
+                <div style="background: var(--bg-tertiary); padding: 0.75rem; border-radius: var(--radius-md); margin-top: 0.75rem;">
+                    <div class="d-flex justify-between">
+                        <span>Items Counted:</span>
+                        <strong>@countedItems / @totalItems</strong>
+                    </div>
+                    @if (uncountedItems > 0)
+                    {
+                        <div class="text-muted" style="font-size: 0.8rem; margin-top: 0.5rem;">
+                            ⚠️ @uncountedItems items have not been counted yet
+                        </div>
+                    }
+                    else
+                    {
+                        <div style="color: var(--success); font-size: 0.8rem; margin-top: 0.5rem;">
+                            ✅ All items have been counted!
+                        </div>
+                    }
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" @onclick="() => _showCompleteConfirm = false">Cancel</button>
+                <button class="btn btn-success" @onclick="CompleteSession">✅ Complete Session</button>
+            </div>
+        </div>
     </div>
 }
 
@@ -266,6 +384,30 @@ else
     }
     .count-btn-sm:hover { background: var(--accent-blue); }
     .count-btn-sm:active { transform: scale(0.95); }
+    
+    .count-input-sm {
+        width: 55px;
+        height: 32px;
+        text-align: center;
+        font-weight: 600;
+        font-size: 1rem;
+        border: 1px solid var(--border-primary);
+        border-radius: var(--radius-sm);
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+        padding: 0 0.25rem;
+        -moz-appearance: textfield;
+    }
+    .count-input-sm::-webkit-outer-spin-button,
+    .count-input-sm::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+    .count-input-sm:focus {
+        outline: none;
+        border-color: var(--accent-blue);
+        background: var(--bg-card);
+    }
     
     .count-value-sm {
         min-width: 50px;
@@ -393,6 +535,38 @@ else
         border-color: var(--accent-blue);
         color: white;
     }
+    
+    /* Category Filter Bar */
+    .category-filter-bar {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        padding: 0.5rem;
+        background: var(--bg-tertiary);
+        border-radius: var(--radius-md);
+    }
+    .category-tab {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.4rem 0.75rem;
+        border: 1px solid transparent;
+        background: var(--bg-card);
+        color: var(--text-secondary);
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        font-size: 0.8rem;
+        transition: all 0.15s ease;
+        white-space: nowrap;
+    }
+    .category-tab:hover {
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+    }
+    .category-tab.active {
+        background: var(--accent-blue);
+        color: white;
+    }
 </style>
 
 @code {
@@ -402,17 +576,23 @@ else
     private List<AreaCountsQueryResult> _areaCounts = new();
     private Dictionary<int, ProductsQueryResult> _productCache = new();
     private Dictionary<int, string> _categoryNames = new();
+    private List<ProductCategoriesQueryResult> _categories = new();
     
     private int? _selectedAreaId;
     private string _searchQuery = "";
     private HashSet<int> _expandedItems = new();
     private string _showFilter = "all"; // "all", "uncounted", "counted"
+    private int? _selectedCategoryId = null; // null = all categories
+    private string _errorMessage = "";
     
     // Partial modal state
     private bool _showPartialModal = false;
     private InventoryItemsQueryResult? _editingItem;
     private int _editingAreaId;
     private int _editingPartialAmount = 5;
+    
+    // Complete confirmation modal state
+    private bool _showCompleteConfirm = false;
     
     protected override void OnInitialized()
     {
@@ -426,6 +606,7 @@ else
         var catOutput = DbService.ProductCategoriesQuery(new ProductCategoriesQueryInput());
         if (catOutput.ReturnValue == ProductCategoriesQueryOutput.Returns.Ok)
         {
+            _categories = catOutput.ResultData.Where(c => c.IsActive).OrderBy(c => c.SortOrder).ToList();
             foreach (var cat in catOutput.ResultData)
             {
                 _categoryNames[cat.Id] = cat.Name;
@@ -507,23 +688,45 @@ else
             });
         }
         
+        // Apply category filter
+        if (_selectedCategoryId.HasValue)
+        {
+            filtered = filtered.Where(i => GetProduct(i.ProductId)?.Category == _selectedCategoryId.Value);
+        }
+        
         // Apply counted/uncounted filter
         if (_showFilter == "uncounted")
             filtered = filtered.Where(i => !HasBeenCounted(i));
         else if (_showFilter == "counted")
             filtered = filtered.Where(i => HasBeenCounted(i));
         
-        // Sort: uncounted first, then counted; within each group sort by category/name
-        return filtered.OrderBy(i => HasBeenCounted(i) ? 1 : 0)
-                       .ThenBy(i => GetProduct(i.ProductId)?.Category)
+        // Sort by category/name only - don't re-sort by counted status mid-session
+        return filtered.OrderBy(i => GetProduct(i.ProductId)?.Category)
                        .ThenBy(i => GetProduct(i.ProductId)?.Name)
                        .ToList();
     }
     
     private bool HasBeenCounted(InventoryItemsQueryResult item)
     {
-        // Item is counted if it has any area counts recorded
-        return _areaCounts.Any(ac => ac.InventoryItemId == item.Id && (ac.FullUnits > 0 || ac.PartialAmount > 0));
+        // Item is counted if it has any area counts recorded OR has received quantity
+        var hasCounts = _areaCounts.Any(ac => ac.InventoryItemId == item.Id && (ac.FullUnits > 0 || ac.PartialAmount > 0));
+        var hasReceived = item.ReceivedQuantity > 0;
+        return hasCounts || hasReceived || item.LastCountedAt != null;
+    }
+    
+    private bool HasCountsOrReceived(InventoryItemsQueryResult item)
+    {
+        // Check if item has any area counts with values OR has received quantity
+        var hasCounts = _areaCounts.Any(ac => ac.InventoryItemId == item.Id && (ac.FullUnits > 0 || ac.PartialAmount > 0));
+        var hasReceived = item.ReceivedQuantity > 0;
+        return hasCounts || hasReceived;
+    }
+    
+    private void MarkItemDone(InventoryItemsQueryResult item)
+    {
+        // Mark as counted and collapse
+        MarkItemCounted(item);
+        _expandedItems.Remove(item.Id);
     }
     
     private void SelectArea(int? areaId)
@@ -545,7 +748,7 @@ else
         var areaCount = GetOrCreateAreaCount(item, areaId);
         areaCount.FullUnits++;
         SaveAreaCount(areaCount);
-        MarkItemCounted(item);
+        // Don't auto-close or mark counted - user will click Done
     }
     
     private void DecrementCount(InventoryItemsQueryResult item, int areaId)
@@ -555,7 +758,17 @@ else
         {
             areaCount.FullUnits--;
             SaveAreaCount(areaCount);
-            MarkItemCounted(item);
+            // Don't auto-close or mark counted - user will click Done
+        }
+    }
+    
+    private void SetCount(InventoryItemsQueryResult item, int areaId, ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int newCount) && newCount >= 0)
+        {
+            var areaCount = GetOrCreateAreaCount(item, areaId);
+            areaCount.FullUnits = newCount;
+            SaveAreaCount(areaCount);
         }
     }
     
@@ -567,12 +780,20 @@ else
         // Create new area count
         var input = new AreaCountsUpsertInput
         {
+            Id = null, // null = insert new record
             InventoryItemId = item.Id,
             AreaId = areaId,
             FullUnits = 0,
             PartialAmount = 0,
             HasPartial = false
         };
+        
+        _errorMessage = "";
+        if (!input.IsValid())
+        {
+            _errorMessage = "AreaCount Create: " + string.Join("<br/>", input.ValidationResults.Select(item => item));
+            return new AreaCountsQueryResult(0, item.Id, areaId, 0, 0, false, DateTime.Now, DateTime.Now);
+        }
         
         var output = DbService.AreaCountsUpsert(input);
         if (output.ReturnValue == AreaCountsUpsertOutput.Returns.Ok)
@@ -585,6 +806,10 @@ else
                 _areaCounts = countsOutput.ResultData.Where(c => itemIds.Contains(c.InventoryItemId)).ToList();
             }
             return GetAreaCount(item.Id, areaId)!;
+        }
+        else
+        {
+            _errorMessage = $"AreaCount Create failed: {output.ReturnValue}";
         }
         
         return new AreaCountsQueryResult(0, item.Id, areaId, 0, 0, false, DateTime.Now, DateTime.Now);
@@ -602,7 +827,18 @@ else
             HasPartial = count.HasPartial
         };
         
-        DbService.AreaCountsUpsert(input);
+        _errorMessage = "";
+        if (!input.IsValid())
+        {
+            _errorMessage = "AreaCount Save: " + string.Join("<br/>", input.ValidationResults.Select(item => item));
+            return;
+        }
+        
+        var output = DbService.AreaCountsUpsert(input);
+        if (output.ReturnValue != AreaCountsUpsertOutput.Returns.Ok)
+        {
+            _errorMessage = $"AreaCount Save failed: {output.ReturnValue}";
+        }
         StateHasChanged();
     }
     
@@ -622,7 +858,18 @@ else
             LastCountedAt = DateTime.Now
         };
         
-        DbService.InventoryItemsUpsert(input);
+        if (!input.IsValid())
+        {
+            _errorMessage = "MarkItemCounted: " + string.Join("<br/>", input.ValidationResults.Select(v => v));
+            return;
+        }
+        
+        var output = DbService.InventoryItemsUpsert(input);
+        if (output.ReturnValue != InventoryItemsUpsertOutput.Returns.Ok)
+        {
+            _errorMessage = $"MarkItemCounted failed: {output.ReturnValue}";
+            return;
+        }
         item.LastCountedAt = DateTime.Now;
     }
     
@@ -644,7 +891,19 @@ else
                 LastCountedAt = item.LastCountedAt
             };
             
-            DbService.InventoryItemsUpsert(input);
+            _errorMessage = "";
+            if (!input.IsValid())
+            {
+                _errorMessage = "UpdateReceived: " + string.Join("<br/>", input.ValidationResults.Select(v => v));
+                return;
+            }
+            
+            var output = DbService.InventoryItemsUpsert(input);
+            if (output.ReturnValue != InventoryItemsUpsertOutput.Returns.Ok)
+            {
+                _errorMessage = $"UpdateReceived failed: {output.ReturnValue}";
+                return;
+            }
             item.ReceivedQuantity = received;
             item.ReceivedCost = received * item.UnitCost;
         }
@@ -673,7 +932,7 @@ else
         areaCount.HasPartial = true;
         areaCount.PartialAmount = _editingPartialAmount;
         SaveAreaCount(areaCount);
-        MarkItemCounted(_editingItem);
+        // Don't mark counted - user will click Done button
         ClosePartialModal();
     }
     
@@ -689,6 +948,11 @@ else
             SaveAreaCount(areaCount);
         }
         ClosePartialModal();
+    }
+    
+    private void ShowCompleteConfirmation()
+    {
+        _showCompleteConfirm = true;
     }
     
     private void CompleteSession()
@@ -707,8 +971,24 @@ else
             CompletedAt = DateTime.Now
         };
         
-        DbService.InventorySessionsUpsert(input);
-        LoadData();
+        _errorMessage = "";
+        if (!input.IsValid())
+        {
+            _errorMessage = "CompleteSession: " + string.Join("<br/>", input.ValidationResults.Select(v => v));
+            _showCompleteConfirm = false;
+            return;
+        }
+        
+        var output = DbService.InventorySessionsUpsert(input);
+        if (output.ReturnValue != InventorySessionsUpsertOutput.Returns.Ok)
+        {
+            _errorMessage = $"CompleteSession failed: {output.ReturnValue}";
+            _showCompleteConfirm = false;
+            return;
+        }
+        
+        _showCompleteConfirm = false;
+        LoadData(); // This will show "no active session" state
     }
     
     private bool ShouldShowPartial(int category)
@@ -728,5 +1008,30 @@ else
             var n when n.Contains("mixer") => "🧃",
             _ => "📦"
         };
+    }
+    
+    private List<ProductCategoriesQueryResult> GetActiveCategories()
+    {
+        // Return only categories that have items in current session
+        var categoryIdsInUse = _items
+            .Select(i => GetProduct(i.ProductId)?.Category ?? 0)
+            .Distinct()
+            .ToHashSet();
+        
+        return _categories.Where(c => categoryIdsInUse.Contains(c.Id)).ToList();
+    }
+    
+    private int GetCategoryCount(int? categoryId)
+    {
+        // Count uncounted items in this category (respects current area filter)
+        var items = _items.AsEnumerable();
+        
+        if (categoryId.HasValue)
+        {
+            items = items.Where(i => GetProduct(i.ProductId)?.Category == categoryId.Value);
+        }
+        
+        // Show uncounted count to help users know what's left
+        return items.Count(i => !HasBeenCounted(i));
     }
 }

@@ -1,5 +1,4 @@
 @inherits LayoutComponentBase
-
 <div class="page">
     <nav class="top-nav">
         <div class="nav-container">
@@ -32,19 +31,17 @@
                     <span class="nav-icon">📅</span>
                     <span class="nav-text">Sessions</span>
                 </NavLink>
-                @* <NavLink href="/settings" class="nav-link nav-link-settings">
+                @* <NavLink href="/settings" class="nav-link">
                     <span class="nav-icon">⚙️</span>
                     <span class="nav-text">Settings</span>
                 </NavLink> *@
             </div>
         </div>
     </nav>
-
     <main class="main-content">
         @Body
     </main>
 </div>
-
 <style>
     /* Error UI styling */
     #blazor-error-ui {
