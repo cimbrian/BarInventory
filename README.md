@@ -19,7 +19,7 @@ Sessions expire after 30 days and require re-login.
 2. [Technology Stack](#technology-stack)
 3. [Installation](#installation)
 4. [Database Setup](#database-setup)
-5. [Azure Deployment](#azure-deployment)
+5. [Deployment](#deployment) (Azure & Windows Server/IIS)
 6. [Development Tools](#development-tools)
 7. [Training Guide](#training-guide)
 8. [Common Workflows](#common-workflows)
@@ -47,7 +47,7 @@ Sessions expire after 30 days and require re-login.
 | **Framework** | .NET 8 Blazor Server |
 | **Database** | SQL Server / Azure SQL |
 | **ORM** | [SQL PLUS .NET](https://sqlplus.net/) by AHH Software |
-| **Hosting** | Azure App Service (Free Tier compatible) |
+| **Hosting** | Azure App Service or Windows Server 2016+ / IIS |
 | **UI** | Custom CSS, Mobile-optimized |
 | **PWA** | Service Worker, Manifest |
 
@@ -152,7 +152,7 @@ To remove test data while keeping reference types:
 
 ---
 
-## ☁️ Azure Deployment
+## ☁️ Deployment
 
 ### Azure App Service (Free Tier)
 
@@ -194,6 +194,44 @@ To remove test data while keeping reference types:
 5. **Verify Deployment**
    - Navigate to `https://YOUR_APP.azurewebsites.net`
    - Login with `MartiniCzar` / `count$`
+
+### Windows Server / IIS Deployment
+
+For on-premises hosting on Windows Server 2016 or later:
+
+1. **Install Prerequisites**
+   - [.NET 8 Hosting Bundle](https://dotnet.microsoft.com/download/dotnet/8.0) (includes .NET Runtime + IIS Module)
+   - Restart IIS after installation: `iisreset`
+
+2. **Enable WebSockets in IIS**
+   
+   WebSockets are **required** for Blazor Server (SignalR):
+   - Open **Server Manager** → **Add Roles and Features**
+   - Navigate to: Web Server (IIS) → Web Server → Application Development
+   - Check **WebSocket Protocol**
+   - Complete the installation
+
+3. **Create IIS Site**
+   - Publish the application: `dotnet publish -c Release -o ./publish`
+   - Copy `publish` folder to your server (e.g., `C:\inetpub\BarInventory`)
+   - Create a new IIS site pointing to this folder
+   - Set Application Pool to **No Managed Code** (.NET Core apps don't use the CLR)
+
+4. **Configure Connection String**
+   
+   Edit `appsettings.json` in the publish folder:
+   ```json
+   {
+     "ConnectionStrings": {
+       "BarDBConnection": "Server=YOUR_SQL_SERVER;Database=BarDB;User Id=YOUR_USER;Password=YOUR_PASSWORD;TrustServerCertificate=True;"
+     }
+   }
+   ```
+
+5. **Verify Deployment**
+   - Navigate to your site URL
+   - Login with `MartiniCzar` / `count$`
+   - If you see connection issues, verify WebSockets are enabled
 
 ---
 
