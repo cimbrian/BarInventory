@@ -60,7 +60,7 @@ Sessions expire after 30 days and require re-login.
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
 - [Visual Studio 2022](https://visualstudio.microsoft.com/) or VS Code
 - SQL Server (LocalDB, SQL Server, or Azure SQL)
-- [SQL PLUS .NET VSIX](https://sqlplus.net/) (for ORM regeneration)
+- [SQL+ .NET Code Generation Utility](https://marketplace.visualstudio.com/items?itemName=AHHSoftware.SQLNETCodeGenerationUtilityVersion4) (for ORM regeneration)
 
 ### Clone & Build
 
@@ -244,12 +244,22 @@ This project uses [SQL PLUS .NET](https://sqlplus.net/) for database access. The
 **Created by:** AHH Software — ORM creator Alan Hyneman  
 **GitHub:** [ahhsoftware/sql-plus-version-four-builder](https://github.com/ahhsoftware/sql-plus-version-four-builder)
 
-**Installation:**
-1. Download the VSIX from [sqlplus.net](https://sqlplus.net/)
-2. Install the VSIX in Visual Studio 2022
+**Visual Studio Extension (Required for ORM regeneration):**
+
+1. Install [SQL+ .NET Code Generation Utility Version 4](https://marketplace.visualstudio.com/items?itemName=AHHSoftware.SQLNETCodeGenerationUtilityVersion4) from Visual Studio Marketplace
+2. Restart Visual Studio 2022
+3. This adds **SQL+ Builder** to Visual Studio for processing stored procedures
+
+**SSMS Snippets (Optional):**
+
+SQL+ offers code snippets for SQL Server Management Studio to help with stored procedure parameter decorations:
+
+1. Download: [CodeSnippits.zip](https://sqlplus.net/downloads/CodeSnippits.zip)
+2. Extract and install per SSMS version instructions
+3. Use `Ctrl+K, Ctrl+X` in SSMS to access SQL+ snippets
 
 **Regenerating ORM Classes:**
-1. Open SQL Server Object Explorer
+1. Open SQL Server Object Explorer in Visual Studio
 2. Right-click the database → SQL PLUS → Generate
 3. Select stored procedures to generate
 4. Output goes to `BarDB/` folder
