@@ -1,6 +1,6 @@
 {
-  "name": "Bar Inventory",
-  "short_name": "BarInventory",
+  "name": "CzarWare Inventory",
+  "short_name": "CzarWare",
   "description": "Professional bar inventory management with system of 10s counting",
   "start_url": "/",
   "display": "standalone",
