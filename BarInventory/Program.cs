@@ -1,8 +1,5 @@
-using BarInventory.Services;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.SignalR;
-using BarInventory.BarDB.Models;
-
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,10 +8,6 @@ builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
-
-
-// Register our inventory service as singleton (in-memory store)
-builder.Services.AddSingleton<InventoryService>();
 
 builder.Services.AddServerSideBlazor()
     .AddCircuitOptions(options => { options.DetailedErrors = true; });
@@ -40,10 +33,9 @@ if (string.IsNullOrEmpty(barDBConnection))
     throw new InvalidOperationException("The configuration key 'BarDBConnection' is missing or has a null/empty value.");
 }
 
-// Use the validated barDBConnection value to create the Settings instance
+// Register Settings and BarDB.Service for SQL data access
 builder.Services.AddScoped<BarInventory.Helpers.Settings>((s) => new BarInventory.Helpers.Settings(barDBConnection));
-builder.Services.AddScoped<BarInventory.BarDB.Service>((s) => new BarInventory.BarDB.Service(builder.Configuration["BarDBConnection"]));
-
+builder.Services.AddScoped<BarInventory.BarDB.Service>((s) => new BarInventory.BarDB.Service(barDBConnection));
 
 var app = builder.Build();
 

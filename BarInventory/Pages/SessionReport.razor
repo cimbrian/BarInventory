@@ -1,0 +1,598 @@
+@page "/session-report/{SessionId:int}"
+@using BarInventory.BarDB.Models
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<style>
+    .report-page {
+        background: white;
+        color: #333;
+        padding: 2rem;
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+
+    .report-header {
+        border-bottom: 3px solid #333;
+        padding-bottom: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .report-title {
+        font-size: 1.75rem;
+        font-weight: 700;
+        margin: 0;
+    }
+
+    .report-subtitle {
+        color: #666;
+        margin: 0.25rem 0 0 0;
+    }
+
+    .report-meta {
+        display: flex;
+        gap: 2rem;
+        margin-top: 0.5rem;
+        font-size: 0.9rem;
+        color: #555;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-box {
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 1rem;
+        text-align: center;
+    }
+
+    .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #333;
+    }
+
+    .stat-label {
+        font-size: 0.8rem;
+        color: #666;
+        text-transform: uppercase;
+    }
+
+    .section-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        border-bottom: 2px solid #4a90d9;
+        padding-bottom: 0.5rem;
+        margin: 1.5rem 0 1rem 0;
+    }
+
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+        margin-bottom: 1.5rem;
+    }
+
+        .data-table th {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            padding: 0.5rem;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .data-table td {
+            border: 1px solid #ddd;
+            padding: 0.5rem;
+        }
+
+        .data-table tr:nth-child(even) {
+            background: #fafafa;
+        }
+
+    .text-right {
+        text-align: right;
+    }
+
+    .text-center {
+        text-align: center;
+    }
+
+    .variance-negative {
+        color: #dc3545;
+        font-weight: 600;
+    }
+
+    .variance-positive {
+        color: #28a745;
+        font-weight: 600;
+    }
+
+    .report-footer {
+        border-top: 1px solid #ddd;
+        padding-top: 1rem;
+        margin-top: 2rem;
+        font-size: 0.8rem;
+        color: #888;
+        text-align: center;
+    }
+
+    .no-print {
+        margin-bottom: 1rem;
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .btn-print {
+        background: #4a90d9;
+        color: white;
+        border: none;
+        padding: 0.5rem 1.5rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.9rem;
+    }
+
+    .btn-back {
+        background: #6c757d;
+        color: white;
+        border: none;
+        padding: 0.5rem 1.5rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.9rem;
+    }
+
+    .area-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.75rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .area-box {
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        padding: 0.75rem;
+        text-align: center;
+    }
+
+    .area-name {
+        font-weight: 600;
+        font-size: 0.85rem;
+    }
+
+    .area-count {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #4a90d9;
+    }
+
+    @@media print {
+        .no-print {
+            display: none !important;
+        }
+
+        .report-page {
+            padding: 0;
+            max-width: none;
+        }
+
+        body {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        .stat-box, .area-box {
+            border: 1px solid #999 !important;
+        }
+
+        .data-table th {
+            background: #eee !important;
+        }
+    }
+</style>
+
+@if (IsLoading)
+{
+    <div class="report-page">
+        <p>Loading report...</p>
+    </div>
+}
+else if (Session == null)
+{
+    <div class="report-page">
+        <p>Session not found.</p>
+        <button class="btn-back" @onclick="GoBack">← Back to Sessions</button>
+    </div>
+}
+else
+{
+    <div class="report-page">
+        <!-- Action Buttons (hidden when printing) -->
+        <div class="no-print">
+            <button class="btn-print" @onclick="PrintReport">🖨️ Print Report</button>
+            <button class="btn-back" @onclick="GoBack">← Back to Sessions</button>
+        </div>
+
+        <!-- Report Header -->
+        <div class="report-header">
+            <h1 class="report-title">@Session.SessionName</h1>
+            <p class="report-subtitle">Inventory Session Report</p>
+            <div class="report-meta">
+                <span><strong>Date:</strong> @Session.SessionDate.ToString("MMMM d, yyyy")</span>
+                <span><strong>Frequency:</strong> @GetFrequencyName(Session.Frequency)</span>
+                <span><strong>Counted By:</strong> @(string.IsNullOrEmpty(Session.CountedBy) ? "—" : Session.CountedBy)</span>
+                <span><strong>Status:</strong> @(Session.IsComplete ? "✅ Complete" : "🔄 In Progress")</span>
+            </div>
+            @if (!string.IsNullOrEmpty(Session.Notes))
+            {
+                <p style="margin-top: 0.5rem; font-style: italic; color: #666;">@Session.Notes</p>
+            }
+        </div>
+
+        <!-- Summary Statistics -->
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="stat-value">@SessionItems.Count</div>
+                <div class="stat-label">Products Counted</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">@TotalOnHand.ToString("0.0")</div>
+                <div class="stat-label">Total On Hand</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">@TotalReceived.ToString("0.0")</div>
+                <div class="stat-label">Received Qty</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">@TotalReceivedCost.ToString("C0")</div>
+                <div class="stat-label">Received Cost</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">@SessionLosses.Count</div>
+                <div class="stat-label">Loss Records</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">@TotalLossValue.ToString("C0")</div>
+                <div class="stat-label">Loss Value</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">@VarianceCount</div>
+                <div class="stat-label">Variance Items</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">@InventoryValue.ToString("C0")</div>
+                <div class="stat-label">Inventory Value</div>
+            </div>
+        </div>
+
+        <!-- Area Breakdown -->
+        @if (AreaTotals.Any())
+        {
+            <h2 class="section-title">📍 Counts by Area</h2>
+            <div class="area-grid">
+                @foreach (var area in AreaTotals.OrderBy(a => Areas.FirstOrDefault(ar => ar.Id == a.Key)?.SortOrder ?? 99))
+                {
+                    var areaInfo = Areas.FirstOrDefault(a => a.Id == area.Key);
+                    <div class="area-box">
+                        <div class="area-name">@(areaInfo?.Name ?? "Unknown")</div>
+                        <div class="area-count">@area.Value.ToString("0.0")</div>
+                    </div>
+                }
+            </div>
+        }
+
+        <!-- Inventory Counts Table -->
+        <h2 class="section-title">📦 Inventory Counts</h2>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width: 5%"></th>
+                    <th style="width: 35%">Product</th>
+                    <th class="text-right" style="width: 12%">Start</th>
+                    <th class="text-right" style="width: 12%">Recv'd</th>
+                    <th class="text-right" style="width: 12%">Available</th>
+                    <th class="text-right" style="width: 12%">Counted</th>
+                    <th class="text-right" style="width: 12%">Variance</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in SessionItems.OrderBy(i => GetProductName(i.ProductId)))
+                {
+                    var product = Products.FirstOrDefault(p => p.Id == item.ProductId);
+                    var counted = GetItemTotalCount(item.Id);
+                    var available = item.StartingQuantity + item.ReceivedQuantity;
+                    var variance = counted - available + item.ComputerSold;
+                    <tr>
+                        <td class="text-center">@GetCategoryIcon(product?.Category ?? 0)</td>
+                        <td>
+                            <strong>@(product?.Name ?? "Unknown")</strong>
+                            @if (!string.IsNullOrEmpty(product?.Brand))
+                            {
+                                <br />
+
+                                <small style="color: #666;">@product.Brand</small>
+                            }
+                        </td>
+                        <td class="text-right">@item.StartingQuantity.ToString("0.0")</td>
+                        <td class="text-right">@item.ReceivedQuantity.ToString("0.0")</td>
+                        <td class="text-right">@available.ToString("0.0")</td>
+                        <td class="text-right">@counted.ToString("0.0")</td>
+                        <td class="text-right @(variance < 0 ? "variance-negative" : variance > 0 ? "variance-positive" : "")">
+                            @(variance > 0 ? "+" : "")@variance.ToString("0.0")
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <!-- Losses Table -->
+        @if (SessionLosses.Any())
+        {
+            <h2 class="section-title">📉 Loss Records</h2>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 5%"></th>
+                        <th style="width: 15%">Time</th>
+                        <th style="width: 15%">Type</th>
+                        <th style="width: 25%">Product</th>
+                        <th class="text-right" style="width: 10%">Qty</th>
+                        <th class="text-right" style="width: 10%">Value</th>
+                        <th style="width: 20%">Reason</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var loss in SessionLosses.OrderByDescending(l => l.OccurredAt))
+                    {
+                        var product = Products.FirstOrDefault(p => p.Id == loss.ProductId);
+                        <tr>
+                            <td class="text-center">@GetLossTypeIcon(loss.LossType)</td>
+                            <td>@loss.OccurredAt.ToString("MMM d, h:mm tt")</td>
+                            <td>@GetLossTypeName(loss.LossType)</td>
+                            <td>@(product?.Name ?? "Unknown")</td>
+                            <td class="text-right">@loss.Quantity.ToString("0.0")</td>
+                            <td class="text-right">@loss.EstimatedValue.ToString("C2")</td>
+                            <td>@(loss.Reason ?? "—")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        <!-- Report Footer -->
+        <div class="report-footer">
+            Report generated on @DateTime.Now.ToString("MMMM d, yyyy 'at' h:mm tt") • Bar Inventory System
+        </div>
+    </div>
+}
+
+@code {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    [Parameter]
+    public int SessionId { get; set; }
+
+    [Inject] private BarInventory.BarDB.Service DbService { get; set; } = default!;
+
+    private bool IsLoading = true;
+    private InventorySessionsByIdResult? Session;
+    private List<InventoryItemsQueryResult> SessionItems = new();
+    private List<AreaCountsQueryResult> AllAreaCounts = new();
+    private List<LossRecordsQueryResult> SessionLosses = new();
+    private List<InventoryAreasQueryResult> Areas = new();
+    private List<ProductsQueryResult> Products = new();
+    private Dictionary<int, string> CategoryNames = new();
+    private Dictionary<int, string> LossTypeNames = new();
+    private Dictionary<int, string> FrequencyNames = new();
+
+    // Calculated totals
+    private decimal TotalOnHand = 0;
+    private decimal TotalReceived = 0;
+    private decimal TotalReceivedCost = 0;
+    private decimal TotalLossValue = 0;
+    private decimal InventoryValue = 0;
+    private int VarianceCount = 0;
+    private Dictionary<int, decimal> AreaTotals = new();
+
+    protected override void OnInitialized()
+    {
+        LoadData();
+    }
+
+    private void LoadData()
+    {
+        IsLoading = true;
+
+        try
+        {
+            // Load session
+            var sessionResult = DbService.InventorySessionsById(new InventorySessionsByIdInput(SessionId));
+            if (sessionResult.ReturnValue == InventorySessionsByIdOutput.Returns.Ok)
+            {
+                Session = sessionResult?.ResultData;
+            }
+            if (Session == null) return;
+
+            // Load supporting data
+            var areasResult = DbService.InventoryAreasQuery(new InventoryAreasQueryInput());
+            if (areasResult.ReturnValue == InventoryAreasQueryOutput.Returns.Ok)
+                Areas = areasResult?.ResultData ?? new();
+
+            var productsResult = DbService.ProductsQuery(new ProductsQueryInput());
+            if (productsResult.ReturnValue == ProductsQueryOutput.Returns.Ok)
+                Products = productsResult?.ResultData ?? new();
+
+            var categoriesResult = DbService.ProductCategoriesQuery(new ProductCategoriesQueryInput());
+            if (categoriesResult.ReturnValue == ProductCategoriesQueryOutput.Returns.Ok)
+                if (categoriesResult.ResultData is not null)
+                {
+                    foreach (var c in categoriesResult.ResultData)
+                        CategoryNames[c.Id] = c.Name;
+                }
+            var lossTypesResult = DbService.LossTypesQuery(new LossTypesQueryInput());
+
+            if (lossTypesResult.ReturnValue == LossTypesQueryOutput.Returns.Ok)
+            {
+                if (lossTypesResult.ResultData is not null)
+                {
+                    foreach (var lt in lossTypesResult.ResultData)
+                        LossTypeNames[lt.Id] = lt.Name;
+                }
+            }
+            // Load session-specific data
+            var itemsResult = DbService.InventoryItemsQuery(new InventoryItemsQueryInput { SessionId = SessionId });
+            if (itemsResult.ReturnValue == InventoryItemsQueryOutput.Returns.Ok)
+                SessionItems = itemsResult?.ResultData ?? new();
+
+            var lossesResult = DbService.LossRecordsQuery(new LossRecordsQueryInput { SessionId = SessionId });
+            if (lossesResult.ReturnValue == LossRecordsQueryOutput.Returns.Ok)
+                SessionLosses = lossesResult?.ResultData ?? new();
+
+            // Load area counts for all items
+            AllAreaCounts.Clear();
+            foreach (var item in SessionItems)
+            {
+                var countsResult = DbService.AreaCountsQuery(new AreaCountsQueryInput { InventoryItemId = item.Id });
+                if (countsResult.ReturnValue == AreaCountsQueryOutput.Returns.Ok)
+                {
+                    if (countsResult.ResultData is not null)
+                    AllAreaCounts.AddRange(countsResult.ResultData);
+                }
+            }
+
+            // Calculate totals
+            CalculateTotals();
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void CalculateTotals()
+    {
+        TotalOnHand = 0;
+        TotalReceived = 0;
+        TotalReceivedCost = 0;
+        InventoryValue = 0;
+        VarianceCount = 0;
+        AreaTotals.Clear();
+
+        foreach (var item in SessionItems)
+        {
+            var counted = GetItemTotalCount(item.Id);
+            TotalOnHand += counted;
+            TotalReceived += item.ReceivedQuantity;
+            TotalReceivedCost += item.ReceivedCost;
+            InventoryValue += counted * item.UnitCost;
+
+            var available = item.StartingQuantity + item.ReceivedQuantity;
+            var variance = counted - available + item.ComputerSold;
+            if (variance != 0) VarianceCount++;
+        }
+
+        TotalLossValue = SessionLosses.Sum(l => l.EstimatedValue);
+
+        // Calculate area totals
+        foreach (var count in AllAreaCounts)
+        {
+            var total = count.FullUnits + (count.PartialAmount / 10m);
+            if (!AreaTotals.ContainsKey(count.AreaId))
+                AreaTotals[count.AreaId] = 0;
+            AreaTotals[count.AreaId] += total;
+        }
+    }
+
+    private decimal GetItemTotalCount(int inventoryItemId)
+    {
+        var counts = AllAreaCounts.Where(c => c.InventoryItemId == inventoryItemId);
+        return counts.Sum(c => c.FullUnits + (c.PartialAmount / 10m));
+    }
+
+    private string GetProductName(int productId)
+    {
+        return Products.FirstOrDefault(p => p.Id == productId)?.Name ?? "Unknown";
+    }
+
+    private string GetFrequencyName(int frequencyId)
+    {
+        return FrequencyNames.GetValueOrDefault(frequencyId, frequencyId switch
+        {
+            1 => "Daily",
+            2 => "Weekly",
+            3 => "Bi-Weekly",
+            4 => "Monthly",
+            _ => "Unknown"
+        });
+    }
+
+    private string GetCategoryIcon(int category)
+    {
+        var name = CategoryNames.GetValueOrDefault(category, "").ToLower();
+        if (name.Contains("spirit") || name.Contains("liquor")) return "🥃";
+        if (name.Contains("wine")) return "🍷";
+        if (name.Contains("beer")) return "🍺";
+        if (name.Contains("mixer") || name.Contains("juice") || name.Contains("soda")) return "🧃";
+        return "📦";
+    }
+
+    private string GetLossTypeName(int typeId) => LossTypeNames.GetValueOrDefault(typeId, "Unknown");
+
+    private string GetLossTypeIcon(int typeId)
+    {
+        var name = LossTypeNames.GetValueOrDefault(typeId, "").ToLower();
+        if (name.Contains("break") || name.Contains("damage")) return "💔";
+        if (name.Contains("spill")) return "💧";
+        if (name.Contains("comp") || name.Contains("gift")) return "🎁";
+        if (name.Contains("return") || name.Contains("send back")) return "↩️";
+        if (name.Contains("expired") || name.Contains("waste")) return "❌";
+        if (name.Contains("theft") || name.Contains("missing")) return "🚨";
+        return "📉";
+    }
+
+    private async Task PrintReport()
+    {
+        await JS.InvokeVoidAsync("printPage");
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/sessions");
+    }
+}

@@ -54,6 +54,13 @@
 
     <script src="_framework/blazor.server.js"></script>
     
+    <!-- App Functions -->
+    <script>
+        window.printPage = function() {
+            window.print();
+        };
+    </script>
+    
     <!-- Service Worker Registration -->
     <script>
         if ('serviceWorker' in navigator) {

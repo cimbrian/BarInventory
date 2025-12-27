@@ -1,0 +1,566 @@
+@page "/settings"
+@using BarInventory.BarDB.Models
+
+<PageTitle>Settings - Bar Inventory</PageTitle>
+
+<div class="page-header">
+    <h1 class="page-title">⚙️ Settings</h1>
+    <p class="page-subtitle">Manage lookup tables and system configuration</p>
+</div>
+
+@* Settings Navigation Tabs *@
+<div class="settings-tabs mb-lg">
+    <button class='settings-tab @(ActiveTab == "categories" ? "active" : "")' @onclick='() => ActiveTab = "categories"'>
+        🏷️ Product Categories
+    </button>
+    <button class='settings-tab @(ActiveTab == "containers" ? "active" : "")' @onclick='() => ActiveTab = "containers"'>
+        📦 Container Types
+    </button>
+    <button class='settings-tab @(ActiveTab == "losstypes" ? "active" : "")' @onclick='() => ActiveTab = "losstypes"'>
+        📉 Loss Types
+    </button>
+    <button class='settings-tab @(ActiveTab == "frequencies" ? "active" : "")' @onclick='() => ActiveTab = "frequencies"'>
+        🔄 Frequencies
+    </button>
+</div>
+
+@* Product Categories *@
+@if (ActiveTab == "categories")
+{
+    <div class="card">
+        <div class="card-header d-flex justify-between align-center">
+            <h3 class="card-title">🏷️ Product Categories</h3>
+            <button class="btn btn-primary btn-sm" @onclick="AddCategory">➕ Add Category</button>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">ID</th>
+                        <th>Name</th>
+                        <th class="number">Sort Order</th>
+                        <th>Status</th>
+                        <th style="width: 100px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var cat in Categories.OrderBy(c => c.SortOrder))
+                    {
+                        <tr>
+                            <td class="text-muted">@cat.Id</td>
+                            <td><strong>@cat.Name</strong></td>
+                            <td class="number">@cat.SortOrder</td>
+                            <td>
+                                @if (cat.IsActive)
+                                {
+                                    <span class="item-badge badge-success">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="item-badge badge-muted">Inactive</span>
+                                }
+                            </td>
+                            <td>
+                                <button class="btn btn-ghost btn-sm" @onclick="() => EditCategory(cat)">✏️</button>
+                                <button class="btn btn-ghost btn-sm" @onclick="() => DeleteCategory(cat.Id)">🗑️</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@* Container Types *@
+@if (ActiveTab == "containers")
+{
+    <div class="card">
+        <div class="card-header d-flex justify-between align-center">
+            <h3 class="card-title">📦 Container Types</h3>
+            <button class="btn btn-primary btn-sm" @onclick="AddContainer">➕ Add Container Type</button>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">ID</th>
+                        <th>Name</th>
+                        <th class="number">Sort Order</th>
+                        <th>Status</th>
+                        <th style="width: 100px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var ct in ContainerTypes.OrderBy(c => c.SortOrder))
+                    {
+                        <tr>
+                            <td class="text-muted">@ct.Id</td>
+                            <td><strong>@ct.Name</strong></td>
+                            <td class="number">@ct.SortOrder</td>
+                            <td>
+                                @if (ct.IsActive)
+                                {
+                                    <span class="item-badge badge-success">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="item-badge badge-muted">Inactive</span>
+                                }
+                            </td>
+                            <td>
+                                <button class="btn btn-ghost btn-sm" @onclick="() => EditContainer(ct)">✏️</button>
+                                <button class="btn btn-ghost btn-sm" @onclick="() => DeleteContainer(ct.Id)">🗑️</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@* Loss Types *@
+@if (ActiveTab == "losstypes")
+{
+    <div class="card">
+        <div class="card-header d-flex justify-between align-center">
+            <h3 class="card-title">📉 Loss Types</h3>
+            <button class="btn btn-primary btn-sm" @onclick="AddLossType">➕ Add Loss Type</button>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">ID</th>
+                        <th>Name</th>
+                        <th class="number">Sort Order</th>
+                        <th>Status</th>
+                        <th style="width: 100px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var lt in LossTypes.OrderBy(l => l.SortOrder))
+                    {
+                        <tr>
+                            <td class="text-muted">@lt.Id</td>
+                            <td><strong>@lt.Name</strong></td>
+                            <td class="number">@lt.SortOrder</td>
+                            <td>
+                                @if (lt.IsActive)
+                                {
+                                    <span class="item-badge badge-success">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="item-badge badge-muted">Inactive</span>
+                                }
+                            </td>
+                            <td>
+                                <button class="btn btn-ghost btn-sm" @onclick="() => EditLossType(lt)">✏️</button>
+                                <button class="btn btn-ghost btn-sm" @onclick="() => DeleteLossType(lt.Id)">🗑️</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@* Frequencies *@
+@if (ActiveTab == "frequencies")
+{
+    <div class="card">
+        <div class="card-header d-flex justify-between align-center">
+            <h3 class="card-title">🔄 Inventory Frequencies</h3>
+            <button class="btn btn-primary btn-sm" @onclick="AddFrequency">➕ Add Frequency</button>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">ID</th>
+                        <th>Name</th>
+                        <th class="number">Sort Order</th>
+                        <th>Status</th>
+                        <th style="width: 100px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var freq in Frequencies.OrderBy(f => f.SortOrder))
+                    {
+                        <tr>
+                            <td class="text-muted">@freq.Id</td>
+                            <td><strong>@freq.Name</strong></td>
+                            <td class="number">@freq.SortOrder</td>
+                            <td>
+                                @if (freq.IsActive)
+                                {
+                                    <span class="item-badge badge-success">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="item-badge badge-muted">Inactive</span>
+                                }
+                            </td>
+                            <td>
+                                <button class="btn btn-ghost btn-sm" @onclick="() => EditFrequency(freq)">✏️</button>
+                                <button class="btn btn-ghost btn-sm" @onclick="() => DeleteFrequency(freq.Id)">🗑️</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@* Edit Modal - Generic for all types *@
+@if (ShowEditModal)
+{
+    <div class="modal-backdrop" @onclick="CloseEditModal">
+        <div class="modal" @onclick:stopPropagation="true" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3 class="modal-title">@EditModalTitle</h3>
+                <button class="modal-close" @onclick="CloseEditModal">×</button>
+            </div>
+            <div class="modal-body">
+                @if (!string.IsNullOrEmpty(EditErrorMessage))
+                {
+                    <div class="alert alert-danger mb-md">@EditErrorMessage</div>
+                }
+                
+                <div class="form-group">
+                    <label class="form-label">Name</label>
+                    <input type="text" class="form-control" @bind="EditName" placeholder="Enter name..." />
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Sort Order</label>
+                    <input type="number" class="form-control" @bind="EditSortOrder" min="0" />
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">
+                        <input type="checkbox" @bind="EditIsActive" /> Active
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" @onclick="CloseEditModal">Cancel</button>
+                <button class="btn btn-primary" @onclick="SaveEdit">Save</button>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .settings-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        padding: 0.5rem;
+        background: var(--bg-tertiary);
+        border-radius: var(--radius-md);
+    }
+    
+    .settings-tab {
+        padding: 0.75rem 1.25rem;
+        border: none;
+        background: transparent;
+        color: var(--text-secondary);
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        font-size: 0.95rem;
+        transition: all 0.15s ease;
+    }
+    
+    .settings-tab:hover {
+        background: var(--bg-card);
+        color: var(--text-primary);
+    }
+    
+    .settings-tab.active {
+        background: var(--accent-blue);
+        color: white;
+    }
+    
+    .badge-muted {
+        background: var(--bg-tertiary);
+        color: var(--text-secondary);
+    }
+</style>
+
+@code {
+    [Inject] private BarInventory.BarDB.Service DbService { get; set; } = default!;
+
+    private string ActiveTab = "categories";
+    
+    // Data lists
+    private List<ProductCategoriesQueryResult> Categories = new();
+    private List<ContainerTypesQueryResult> ContainerTypes = new();
+    private List<LossTypesQueryResult> LossTypes = new();
+    private List<InventoryFrequenciesQueryResult> Frequencies = new();
+    
+    // Edit modal state
+    private bool ShowEditModal = false;
+    private string EditModalTitle = "";
+    private string EditErrorMessage = "";
+    private string EditType = ""; // "category", "container", "losstype", "frequency"
+    private int EditId = 0;
+    private string EditName = "";
+    private int EditSortOrder = 0;
+    private bool EditIsActive = true;
+
+    protected override void OnInitialized()
+    {
+        LoadAllData();
+    }
+
+    private void LoadAllData()
+    {
+        // Load Categories
+        var catOutput = DbService.ProductCategoriesQuery(new ProductCategoriesQueryInput());
+        if (catOutput.ReturnValue == ProductCategoriesQueryOutput.Returns.Ok)
+        {
+            Categories = catOutput.ResultData ?? new();
+        }
+        
+        // Load Container Types
+        var ctOutput = DbService.ContainerTypesQuery(new ContainerTypesQueryInput());
+        if (ctOutput.ReturnValue == ContainerTypesQueryOutput.Returns.Ok)
+        {
+            ContainerTypes = ctOutput.ResultData ?? new();
+        }
+        
+        // Load Loss Types
+        var ltOutput = DbService.LossTypesQuery(new LossTypesQueryInput());
+        if (ltOutput.ReturnValue == LossTypesQueryOutput.Returns.Ok)
+        {
+            LossTypes = ltOutput.ResultData ?? new();
+        }
+        
+        // Load Frequencies
+        var freqOutput = DbService.InventoryFrequenciesQuery(new InventoryFrequenciesQueryInput());
+        if (freqOutput.ReturnValue == InventoryFrequenciesQueryOutput.Returns.Ok)
+        {
+            Frequencies = freqOutput.ResultData ?? new();
+        }
+    }
+
+    // Category methods
+    private void AddCategory()
+    {
+        EditType = "category";
+        EditId = 0;
+        EditName = "";
+        EditSortOrder = Categories.Count > 0 ? Categories.Max(c => c.SortOrder) + 1 : 1;
+        EditIsActive = true;
+        EditModalTitle = "Add Product Category";
+        EditErrorMessage = "";
+        ShowEditModal = true;
+    }
+
+    private void EditCategory(ProductCategoriesQueryResult cat)
+    {
+        EditType = "category";
+        EditId = cat.Id;
+        EditName = cat.Name;
+        EditSortOrder = cat.SortOrder;
+        EditIsActive = cat.IsActive;
+        EditModalTitle = "Edit Product Category";
+        EditErrorMessage = "";
+        ShowEditModal = true;
+    }
+
+    private void DeleteCategory(int id)
+    {
+        var output = DbService.ProductCategoriesDelete(new ProductCategoriesDeleteInput { Id = id });
+        if (output.ReturnValue == ProductCategoriesDeleteOutput.Returns.Ok)
+        {
+            LoadAllData();
+        }
+    }
+
+    // Container methods
+    private void AddContainer()
+    {
+        EditType = "container";
+        EditId = 0;
+        EditName = "";
+        EditSortOrder = ContainerTypes.Count > 0 ? ContainerTypes.Max(c => c.SortOrder) + 1 : 1;
+        EditIsActive = true;
+        EditModalTitle = "Add Container Type";
+        EditErrorMessage = "";
+        ShowEditModal = true;
+    }
+
+    private void EditContainer(ContainerTypesQueryResult ct)
+    {
+        EditType = "container";
+        EditId = ct.Id;
+        EditName = ct.Name;
+        EditSortOrder = ct.SortOrder;
+        EditIsActive = ct.IsActive;
+        EditModalTitle = "Edit Container Type";
+        EditErrorMessage = "";
+        ShowEditModal = true;
+    }
+
+    private void DeleteContainer(int id)
+    {
+        var output = DbService.ContainerTypesDelete(new ContainerTypesDeleteInput { Id = id });
+        if (output.ReturnValue == ContainerTypesDeleteOutput.Returns.Ok)
+        {
+            LoadAllData();
+        }
+    }
+
+    // Loss Type methods
+    private void AddLossType()
+    {
+        EditType = "losstype";
+        EditId = 0;
+        EditName = "";
+        EditSortOrder = LossTypes.Count > 0 ? LossTypes.Max(l => l.SortOrder) + 1 : 1;
+        EditIsActive = true;
+        EditModalTitle = "Add Loss Type";
+        EditErrorMessage = "";
+        ShowEditModal = true;
+    }
+
+    private void EditLossType(LossTypesQueryResult lt)
+    {
+        EditType = "losstype";
+        EditId = lt.Id;
+        EditName = lt.Name;
+        EditSortOrder = lt.SortOrder;
+        EditIsActive = lt.IsActive;
+        EditModalTitle = "Edit Loss Type";
+        EditErrorMessage = "";
+        ShowEditModal = true;
+    }
+
+    private void DeleteLossType(int id)
+    {
+        var output = DbService.LossTypesDelete(new LossTypesDeleteInput { Id = id });
+        if (output.ReturnValue == LossTypesDeleteOutput.Returns.Ok)
+        {
+            LoadAllData();
+        }
+    }
+
+    // Frequency methods
+    private void AddFrequency()
+    {
+        EditType = "frequency";
+        EditId = 0;
+        EditName = "";
+        EditSortOrder = Frequencies.Count > 0 ? Frequencies.Max(f => f.SortOrder) + 1 : 1;
+        EditIsActive = true;
+        EditModalTitle = "Add Frequency";
+        EditErrorMessage = "";
+        ShowEditModal = true;
+    }
+
+    private void EditFrequency(InventoryFrequenciesQueryResult freq)
+    {
+        EditType = "frequency";
+        EditId = freq.Id;
+        EditName = freq.Name;
+        EditSortOrder = freq.SortOrder;
+        EditIsActive = freq.IsActive;
+        EditModalTitle = "Edit Frequency";
+        EditErrorMessage = "";
+        ShowEditModal = true;
+    }
+
+    private void DeleteFrequency(int id)
+    {
+        var output = DbService.InventoryFrequenciesDelete(new InventoryFrequenciesDeleteInput { Id = id });
+        if (output.ReturnValue == InventoryFrequenciesDeleteOutput.Returns.Ok)
+        {
+            LoadAllData();
+        }
+    }
+
+    // Modal methods
+    private void CloseEditModal()
+    {
+        ShowEditModal = false;
+        EditErrorMessage = "";
+    }
+
+    private void SaveEdit()
+    {
+        if (string.IsNullOrWhiteSpace(EditName))
+        {
+            EditErrorMessage = "Name is required.";
+            return;
+        }
+
+        bool success = false;
+
+        switch (EditType)
+        {
+            case "category":
+                var catInput = new ProductCategoriesUpsertInput
+                {
+                    Id = EditId > 0 ? EditId : null,
+                    Name = EditName,
+                    SortOrder = EditSortOrder,
+                    IsActive = EditIsActive
+                };
+                var catOutput = DbService.ProductCategoriesUpsert(catInput);
+                success = catOutput.ReturnValue == ProductCategoriesUpsertOutput.Returns.Ok;
+                break;
+
+            case "container":
+                var ctInput = new ContainerTypesUpsertInput
+                {
+                    Id = EditId > 0 ? EditId : null,
+                    Name = EditName,
+                    SortOrder = EditSortOrder,
+                    IsActive = EditIsActive
+                };
+                var ctOutput = DbService.ContainerTypesUpsert(ctInput);
+                success = ctOutput.ReturnValue == ContainerTypesUpsertOutput.Returns.Ok;
+                break;
+
+            case "losstype":
+                var ltInput = new LossTypesUpsertInput
+                {
+                    Id = EditId > 0 ? EditId : null,
+                    Name = EditName,
+                    SortOrder = EditSortOrder,
+                    IsActive = EditIsActive
+                };
+                var ltOutput = DbService.LossTypesUpsert(ltInput);
+                success = ltOutput.ReturnValue == LossTypesUpsertOutput.Returns.Ok;
+                break;
+
+            case "frequency":
+                var freqInput = new InventoryFrequenciesUpsertInput
+                {
+                    Id = EditId > 0 ? EditId : null,
+                    Name = EditName,
+                    SortOrder = EditSortOrder,
+                    IsActive = EditIsActive
+                };
+                var freqOutput = DbService.InventoryFrequenciesUpsert(freqInput);
+                success = freqOutput.ReturnValue == InventoryFrequenciesUpsertOutput.Returns.Ok;
+                break;
+        }
+
+        if (success)
+        {
+            LoadAllData();
+            CloseEditModal();
+        }
+        else
+        {
+            EditErrorMessage = "Error saving. Please try again.";
+        }
+    }
+}

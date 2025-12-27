@@ -1,150 +1,133 @@
 @page "/"
-@inject InventoryService InventoryService
+@using BarInventory.BarDB.Models
 
 <PageTitle>Dashboard - Bar Inventory</PageTitle>
 
 <div class="page-header">
     <h1 class="page-title">Dashboard</h1>
-    <p class="page-subtitle">
-        @if (_currentSession != null)
-        {
-            <span>@_currentSession.SessionName • Started @_currentSession.SessionDate.ToString("MMM d, yyyy")</span>
-        }
-        else
-        {
-            <span>No active inventory session</span>
-        }
-    </p>
+    <p class="page-subtitle">@DateTime.Now.ToString("dddd, MMMM d, yyyy")</p>
 </div>
 
-@if (_currentSession == null)
+@* Stats Cards *@
+<div class="stats-grid mb-lg">
+    <div class="stat-card">
+        <div class="stat-icon">📦</div>
+        <div class="stat-content">
+            <div class="stat-value">@ProductCount</div>
+            <div class="stat-label">Products</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">📋</div>
+        <div class="stat-content">
+            <div class="stat-value">@ActiveSessionCount</div>
+            <div class="stat-label">Active Sessions</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">📍</div>
+        <div class="stat-content">
+            <div class="stat-value">@AreaCount</div>
+            <div class="stat-label">Inventory Areas</div>
+        </div>
+    </div>
+    <div class="stat-card stat-card-warning">
+        <div class="stat-icon">📉</div>
+        <div class="stat-content">
+            <div class="stat-value">@TotalLossValue.ToString("C0")</div>
+            <div class="stat-label">Total Losses (This Month)</div>
+        </div>
+    </div>
+</div>
+
+@* Quick Actions *@
+<div class="card mb-lg">
+    <div class="card-header">
+        <h2 class="card-title">Quick Actions</h2>
+    </div>
+    <div class="card-body">
+        <div class="d-flex gap-md" style="flex-wrap: wrap;">
+            <a href="/capture" class="btn btn-primary">
+                📱 Start Counting
+            </a>
+            <a href="/sessions" class="btn btn-outline">
+                📋 View Sessions
+            </a>
+            <a href="/products" class="btn btn-outline">
+                📦 Manage Products
+            </a>
+            <a href="/losses" class="btn btn-outline">
+                📉 Record Loss
+            </a>
+            <a href="/settings" class="btn btn-ghost">
+                ⚙️ Settings
+            </a>
+        </div>
+    </div>
+</div>
+
+@* Active Session *@
+@if (ActiveSession != null)
 {
-    <div class="card">
+    <div class="card mb-lg">
+        <div class="card-header d-flex justify-between align-center">
+            <h2 class="card-title">Current Session</h2>
+            <span class="item-badge badge-warning">🔄 In Progress</span>
+        </div>
         <div class="card-body">
-            <div class="empty-state">
-                <div class="empty-state-icon">📋</div>
-                <h2 class="empty-state-title">No Active Session</h2>
-                <p class="empty-state-text">Start a new inventory session to begin counting.</p>
-                <a href="/sessions" class="btn btn-primary btn-lg">Start New Session</a>
+            <div class="d-flex gap-lg" style="flex-wrap: wrap;">
+                <div>
+                    <div class="text-muted" style="font-size: 0.85rem;">Session Name</div>
+                    <div style="font-weight: 500; font-size: 1.1rem;">@ActiveSession.SessionName</div>
+                </div>
+                <div>
+                    <div class="text-muted" style="font-size: 0.85rem;">Date</div>
+                    <div style="font-weight: 500;">@ActiveSession.SessionDate.ToString("MMM dd, yyyy")</div>
+                </div>
+                <div>
+                    <div class="text-muted" style="font-size: 0.85rem;">Counted By</div>
+                    <div style="font-weight: 500;">@(string.IsNullOrEmpty(ActiveSession.CountedBy) ? "-" : ActiveSession.CountedBy)</div>
+                </div>
+            </div>
+            <div class="mt-md">
+                <a href="/capture" class="btn btn-primary">
+                    Continue Counting →
+                </a>
             </div>
         </div>
     </div>
 }
-else
+
+@* Recent Loss Records *@
+@if (RecentLosses != null && RecentLosses.Any())
 {
-    @* Stats Grid *@
-    <div class="stats-grid">
-        <StatCard 
-            Label="Inventory Value" 
-            Value="@_summary.TotalInventoryValue.ToString("C0")" />
-        
-        <StatCard 
-            Label="Products Counted" 
-            Value="@($"{_summary.ProductsCounted}/{_summary.TotalProducts}")"
-            Change="@($"{_summary.CompletionPercent:0}%")" />
-        
-        <StatCard 
-            Label="Total Variance" 
-            Value="@_summary.TotalVarianceValue.ToString("C0")"
-            ValueClass="@(_summary.TotalVarianceValue > 100 ? "danger" : _summary.TotalVarianceValue > 0 ? "warning" : "success")"
-            IsPositiveGood="false" />
-        
-        <StatCard 
-            Label="Losses Recorded" 
-            Value="@_summary.TotalLossValue.ToString("C0")"
-            ValueClass="@(_summary.TotalLossValue > 0 ? "warning" : "")" />
-    </div>
-    
-    @* Progress Card *@
-    <div class="card mb-md">
-        <div class="card-header">
-            <h3 class="card-title">Inventory Progress</h3>
-            <span class="text-muted">@_summary.CompletionPercent.ToString("0")% complete</span>
-        </div>
-        <div class="card-body">
-            <div class="progress-bar" style="height: 12px;">
-                <div class="progress-fill @GetProgressClass()" style="width: @_summary.CompletionPercent%"></div>
-            </div>
-            
-            <div class="d-flex justify-between mt-md gap-md" style="flex-wrap: wrap;">
-                <a href="/capture" class="btn btn-primary btn-lg" style="flex: 1; min-width: 200px;">
-                    📝 Continue Counting
-                </a>
-                @if (_summary.CompletionPercent >= 100)
-                {
-                    <button class="btn btn-success btn-lg" @onclick="CompleteSession" style="flex: 1; min-width: 200px;">
-                        ✓ Complete Session
-                    </button>
-                }
-            </div>
-        </div>
-    </div>
-    
-    @* Variance Alerts *@
-    @if (_summary.Alerts.Any())
-    {
-        <div class="card mb-md">
-            <div class="card-header">
-                <h3 class="card-title">⚠️ Variance Alerts</h3>
-                <span class="text-muted">@_summary.Alerts.Count items need attention</span>
-            </div>
-            <div class="card-body" style="padding: 0;">
-                <ul class="variance-list">
-                    @foreach (var alert in _summary.Alerts.Take(10))
-                    {
-                        <li class="variance-item">
-                            <div>
-                                <span class="variance-product">@alert.Product?.DisplayName</span>
-                                <span class="text-muted" style="display: block; font-size: 0.85rem;">
-                                    @GetSeverityLabel(alert.Severity)
-                                </span>
-                            </div>
-                            <span class='variance-amount @(alert.VarianceAmount > 0 ? "positive" : "negative")'>
-                                @(alert.VarianceAmount > 0 ? "+" : "")@alert.VarianceAmount.ToString("0.0") units
-                            </span>
-                        </li>
-                    }
-                </ul>
-            </div>
-            @if (_summary.Alerts.Count > 10)
-            {
-                <div class="card-footer">
-                    <a href="/lookup?filter=variance" class="btn btn-outline btn-sm">View All @_summary.Alerts.Count Alerts</a>
-                </div>
-            }
-        </div>
-    }
-    
-    @* Category Breakdown *@
     <div class="card">
-        <div class="card-header">
-            <h3 class="card-title">Inventory by Category</h3>
+        <div class="card-header d-flex justify-between align-center">
+            <h2 class="card-title">Recent Losses</h2>
+            <a href="/losses" class="btn btn-ghost btn-sm">View All →</a>
         </div>
         <div class="card-body" style="padding: 0;">
             <div class="table-wrapper">
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>Category</th>
+                            <th>Date</th>
+                            <th>Product</th>
+                            <th>Type</th>
                             <th class="number">Value</th>
-                            <th class="number">Variance</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var category in Enum.GetValues<ProductCategory>())
+                        @foreach (var loss in RecentLosses)
                         {
-                            var value = _summary.ValueByCategory.GetValueOrDefault(category);
-                            var variance = _summary.VarianceByCategory.GetValueOrDefault(category);
-                            @if (value > 0 || variance != 0)
-                            {
-                                <tr>
-                                    <td>@GetCategoryDisplayName(category)</td>
-                                    <td class="number">@value.ToString("C0")</td>
-                                    <td class='number @(variance > 0 ? "text-danger" : variance < 0 ? "text-success" : "")'>
-                                        @(variance != 0 ? variance.ToString("C0") : "—")
-                                    </td>
-                                </tr>
-                            }
+                            <tr>
+                                <td>@loss.OccurredAt.ToString("MMM dd")</td>
+                                <td>@GetProductName(loss.ProductId)</td>
+                                <td>
+                                    <span class="item-badge">@GetLossTypeName(loss.LossType)</span>
+                                </td>
+                                <td class="number">@loss.EstimatedValue.ToString("C2")</td>
+                            </tr>
                         }
                     </tbody>
                 </table>
@@ -154,58 +137,88 @@ else
 }
 
 @code {
-    private InventorySession? _currentSession;
-    private InventorySummary _summary = new();
-    
-    protected override void OnInitialized()
+    [Inject]
+    private BarInventory.BarDB.Service DbService { get; set; } = default!;
+
+    // Dashboard Stats
+    protected int ProductCount = 0;
+    protected int ActiveSessionCount = 0;
+    protected int AreaCount = 0;
+    protected decimal TotalLossValue = 0;
+
+    // Active Session
+    protected InventorySessionsQueryResult? ActiveSession = null;
+
+    // Recent Losses
+    protected List<LossRecordsQueryResult>? RecentLosses = null;
+
+    // Lookup caches
+    protected Dictionary<int, string>? ProductDropDowns = null;
+    protected Dictionary<int, string>? LossTypeDropDowns = null;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        LoadData();
-    }
-    
-    private void LoadData()
-    {
-        _currentSession = InventoryService.GetCurrentSession();
-        if (_currentSession != null)
+        if (firstRender)
         {
-            _summary = InventoryService.GetSessionSummary(_currentSession.Id);
+            LoadDashboardData();
+            StateHasChanged();
         }
     }
-    
-    private string GetProgressClass()
+
+    protected void LoadDashboardData()
     {
-        if (_summary.CompletionPercent >= 100) return "success";
-        if (_summary.CompletionPercent >= 50) return "";
-        return "warning";
-    }
-    
-    private string GetSeverityLabel(VarianceSeverity severity) => severity switch
-    {
-        VarianceSeverity.Low => "Low variance",
-        VarianceSeverity.Medium => "Medium variance",
-        VarianceSeverity.High => "High variance - review needed",
-        VarianceSeverity.Critical => "Critical - possible theft",
-        _ => ""
-    };
-    
-    private string GetCategoryDisplayName(ProductCategory category) => category switch
-    {
-        ProductCategory.Liquor => "🥃 Liquor",
-        ProductCategory.Wine => "🍷 Wine",
-        ProductCategory.BeerBottle => "🍺 Beer (Bottles)",
-        ProductCategory.BeerCan => "🥫 Beer (Cans)",
-        ProductCategory.Seltzer => "✨ Seltzers",
-        ProductCategory.DraftBeer => "🍻 Draft Beer",
-        ProductCategory.Mixers => "🧃 Mixers",
-        ProductCategory.Other => "📦 Other",
-        _ => category.ToString()
-    };
-    
-    private void CompleteSession()
-    {
-        if (_currentSession != null)
+        // Count Products
+        var productsOutput = DbService.ProductsQuery(new ProductsQueryInput { IsActive = true });
+        if (productsOutput.ReturnValue == ProductsQueryOutput.Returns.Ok && productsOutput.ResultData != null)
         {
-            InventoryService.CompleteSession(_currentSession.Id);
-            LoadData();
+            ProductCount = productsOutput.ResultData.Count;
+            ProductDropDowns = productsOutput.ResultData.ToDictionary(p => p.Id, p => $"{p.Brand} {p.Name}");
         }
+
+        // Count Active Sessions
+        var sessionsOutput = DbService.InventorySessionsQuery(new InventorySessionsQueryInput { IsComplete = false });
+        if (sessionsOutput.ReturnValue == InventorySessionsQueryOutput.Returns.Ok && sessionsOutput.ResultData != null)
+        {
+            ActiveSessionCount = sessionsOutput.ResultData.Count;
+            ActiveSession = sessionsOutput.ResultData.OrderByDescending(s => s.SessionDate).FirstOrDefault();
+        }
+
+        // Count Areas
+        var areasOutput = DbService.InventoryAreasQuery(new InventoryAreasQueryInput { IsActive = true });
+        if (areasOutput.ReturnValue == InventoryAreasQueryOutput.Returns.Ok && areasOutput.ResultData != null)
+        {
+            AreaCount = areasOutput.ResultData.Count;
+        }
+
+        // Load Loss Types for lookup
+        var lossTypesOutput = DbService.LossTypesQuery(new LossTypesQueryInput());
+        if (lossTypesOutput.ReturnValue == LossTypesQueryOutput.Returns.Ok && lossTypesOutput.ResultData != null)
+        {
+            LossTypeDropDowns = lossTypesOutput.ResultData.ToDictionary(l => l.Id, l => l.Name);
+        }
+
+        // Load Recent Losses (this month)
+        var lossesOutput = DbService.LossRecordsQuery(new LossRecordsQueryInput());
+        if (lossesOutput.ReturnValue == LossRecordsQueryOutput.Returns.Ok && lossesOutput.ResultData != null)
+        {
+            var thisMonth = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
+            var monthlyLosses = lossesOutput.ResultData.Where(l => l.OccurredAt >= thisMonth).ToList();
+            TotalLossValue = monthlyLosses.Sum(l => l.EstimatedValue);
+            RecentLosses = lossesOutput.ResultData.OrderByDescending(l => l.OccurredAt).Take(5).ToList();
+        }
+    }
+
+    protected string GetProductName(int productId)
+    {
+        if (ProductDropDowns != null && ProductDropDowns.TryGetValue(productId, out var name))
+            return name;
+        return "Unknown Product";
+    }
+
+    protected string GetLossTypeName(int lossTypeId)
+    {
+        if (LossTypeDropDowns != null && LossTypeDropDowns.TryGetValue(lossTypeId, out var name))
+            return name;
+        return "Unknown";
     }
 }

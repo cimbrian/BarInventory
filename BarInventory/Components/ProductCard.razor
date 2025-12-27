@@ -1,12 +1,13 @@
 @* Product card component for inventory capture *@
+@using BarInventory.BarDB.Models
 
 <div class="inventory-item @GetStatusClass()">
     <div class="item-header">
         <div>
-            <div class="item-name">@Product.DisplayName</div>
+            <div class="item-name">@Product.Brand @Product.Name</div>
             <div class="item-meta">@Product.SizeDescription • $@Product.UnitCost.ToString("0.00")</div>
         </div>
-        <span class="item-badge @GetCategoryBadgeClass()">@GetCategoryLabel()</span>
+        <span class="item-badge @GetCategoryBadgeClass()">@CategoryName</span>
     </div>
     
     @if (ShowCounts)
@@ -43,7 +44,8 @@
 </div>
 
 @code {
-    [Parameter] public Product Product { get; set; } = null!;
+    [Parameter] public ProductsQueryResult Product { get; set; } = null!;
+    [Parameter] public string CategoryName { get; set; } = "";
     [Parameter] public decimal StartingQuantity { get; set; }
     [Parameter] public decimal ReceivedQuantity { get; set; }
     [Parameter] public decimal CurrentOnHand { get; set; }
@@ -64,26 +66,16 @@
         return "";
     }
     
-    private string GetCategoryBadgeClass() => Product.Category switch
+    private string GetCategoryBadgeClass()
     {
-        ProductCategory.Liquor => "badge-liquor",
-        ProductCategory.Wine => "badge-wine",
-        ProductCategory.BeerBottle => "badge-beer-bottle",
-        ProductCategory.BeerCan => "badge-beer-can",
-        ProductCategory.Seltzer => "badge-seltzer",
-        ProductCategory.DraftBeer => "badge-draft",
-        _ => ""
-    };
-    
-    private string GetCategoryLabel() => Product.Category switch
-    {
-        ProductCategory.Liquor => "Liquor",
-        ProductCategory.Wine => "Wine",
-        ProductCategory.BeerBottle => "Bottle",
-        ProductCategory.BeerCan => "Can",
-        ProductCategory.Seltzer => "Seltzer",
-        ProductCategory.DraftBeer => "Draft",
-        ProductCategory.Mixers => "Mixer",
-        _ => "Other"
-    };
+        var name = CategoryName.ToLower();
+        return name switch
+        {
+            "spirits" => "badge-liquor",
+            "wine" => "badge-wine",
+            "beer" => "badge-beer-bottle",
+            "mixers" => "badge-mixer",
+            _ => ""
+        };
+    }
 }

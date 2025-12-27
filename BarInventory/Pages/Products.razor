@@ -1,12 +1,12 @@
 @page "/products"
-@inject InventoryService InventoryService
+@using BarInventory.BarDB.Models
 
 <PageTitle>Products - Bar Inventory</PageTitle>
 
 <div class="page-header d-flex justify-between align-center" style="flex-wrap: wrap; gap: 1rem;">
     <div>
         <h1 class="page-title">Product Catalog</h1>
-        <p class="page-subtitle">@_products.Count products in @_categories.Count categories</p>
+        <p class="page-subtitle">@(ProductList?.Count ?? 0) products</p>
     </div>
     <button class="btn btn-primary" @onclick="OpenAddProduct">
         ➕ Add Product
@@ -15,16 +15,19 @@
 
 @* Category Filter *@
 <div class="category-pills mb-md">
-    <button class='category-pill @(_selectedCategory == null ? "active" : "")' @onclick="() => _selectedCategory = null">
-        All (@_products.Count)
+    <button class='category-pill @(SelectedCategoryId == null ? "active" : "")' @onclick="() => FilterByCategory(null)">
+        All (@(ProductList?.Count ?? 0))
     </button>
-    @foreach (var category in _categories)
+    @if (CategoryDropDowns != null)
     {
-        var count = _products.Count(p => p.Category == category);
-        <button class='category-pill @(_selectedCategory == category ? "active" : "")' 
-                @onclick="() => _selectedCategory = category">
-            @GetCategoryIcon(category) @GetCategoryName(category) (@count)
-        </button>
+        @foreach (var category in CategoryDropDowns)
+        {
+            var count = ProductList?.Count(p => p.Category == category.Key) ?? 0;
+            <button class='category-pill @(SelectedCategoryId == category.Key ? "active" : "")' 
+                    @onclick="() => FilterByCategory(category.Key)">
+                @GetCategoryIcon(category.Key) @category.Value (@count)
+            </button>
+        }
     }
 </div>
 
@@ -34,7 +37,7 @@
     <input type="text" 
            class="form-control" 
            placeholder="Search products..." 
-           @bind="_searchQuery" 
+           @bind="SearchQuery" 
            @bind:event="oninput" />
 </div>
 
@@ -62,7 +65,7 @@
                                 <button class="btn btn-ghost btn-sm" @onclick="() => EditProduct(product)">✏️</button>
                             </td>
                             <td>
-                                <div style="font-weight: 500;">@product.DisplayName</div>
+                                <div style="font-weight: 500;">@product.Brand @product.Name</div>
                                 @if (!string.IsNullOrEmpty(product.Barcode))
                                 {
                                     <div class="text-muted" style="font-size: 0.8rem;">@product.Barcode</div>
@@ -99,47 +102,58 @@
     <div class="empty-state mt-lg">
         <div class="empty-state-icon">📦</div>
         <h2 class="empty-state-title">No Products Found</h2>
-        <p class="empty-state-text">Try adjusting your search or filters.</p>
+        <p class="empty-state-text">@(string.IsNullOrEmpty(FilterMessage) ? "Try adjusting your search or filters." : FilterMessage)</p>
     </div>
 }
 
 @* Add/Edit Product Modal *@
-@if (_showProductModal)
+@if (ShowProductModal)
 {
     <div class="modal-backdrop" @onclick="CloseModal">
         <div class="modal" @onclick:stopPropagation="true" style="max-width: 600px;">
             <div class="modal-header">
-                <h3 class="modal-title">@(_editingProduct == null ? "Add Product" : "Edit Product")</h3>
+                <h3 class="modal-title">@(IsNewProduct ? "Add Product" : "Edit Product")</h3>
                 <button class="modal-close" @onclick="CloseModal">×</button>
             </div>
             <div class="modal-body">
+                @if (!string.IsNullOrEmpty(FormErrorMessage))
+                {
+                    <div class="alert alert-danger mb-md">@FormErrorMessage</div>
+                }
+                
                 <div class="d-flex gap-md" style="flex-wrap: wrap;">
                     <div class="form-group" style="flex: 1; min-width: 200px;">
                         <label class="form-label">Brand</label>
-                        <input type="text" class="form-control" @bind="_editProduct.Brand" placeholder="e.g., Tito's" />
+                        <input type="text" class="form-control" @bind="DataToUpsert!.Brand" placeholder="e.g., Tito's" />
                     </div>
                     <div class="form-group" style="flex: 1; min-width: 200px;">
                         <label class="form-label">Name</label>
-                        <input type="text" class="form-control" @bind="_editProduct.Name" placeholder="e.g., Vodka" />
+                        <input type="text" class="form-control" @bind="DataToUpsert!.Name" placeholder="e.g., Vodka" />
                     </div>
                 </div>
                 
                 <div class="d-flex gap-md" style="flex-wrap: wrap;">
                     <div class="form-group" style="flex: 1; min-width: 150px;">
                         <label class="form-label">Category</label>
-                        <select class="form-control" @bind="_editProduct.Category">
-                            @foreach (var category in Enum.GetValues<ProductCategory>())
+                        <select class="form-control" @bind="DataToUpsert!.Category">
+                            @if (CategoryDropDowns != null)
                             {
-                                <option value="@category">@GetCategoryName(category)</option>
+                                @foreach (var cat in CategoryDropDowns)
+                                {
+                                    <option value="@cat.Key">@cat.Value</option>
+                                }
                             }
                         </select>
                     </div>
                     <div class="form-group" style="flex: 1; min-width: 150px;">
                         <label class="form-label">Container Type</label>
-                        <select class="form-control" @bind="_editProduct.ContainerType">
-                            @foreach (var container in Enum.GetValues<ContainerType>())
+                        <select class="form-control" @bind="DataToUpsert!.ContainerType">
+                            @if (ContainerTypeDropDowns != null)
                             {
-                                <option value="@container">@GetContainerName(container)</option>
+                                @foreach (var ct in ContainerTypeDropDowns)
+                                {
+                                    <option value="@ct.Key">@ct.Value</option>
+                                }
                             }
                         </select>
                     </div>
@@ -147,39 +161,49 @@
                 
                 <div class="form-group">
                     <label class="form-label">Size Description</label>
-                    <input type="text" class="form-control" @bind="_editProduct.SizeDescription" placeholder="e.g., 750ml, 12oz can" />
+                    <input type="text" class="form-control" @bind="DataToUpsert!.SizeDescription" placeholder="e.g., 750ml, 12oz can" />
                 </div>
                 
                 <div class="d-flex gap-md" style="flex-wrap: wrap;">
                     <div class="form-group" style="flex: 1; min-width: 120px;">
                         <label class="form-label">Unit Cost</label>
-                        <input type="number" class="form-control" @bind="_editProduct.UnitCost" step="0.01" min="0" />
+                        <input type="number" class="form-control" @bind="DataToUpsert!.UnitCost" step="0.01" min="0" />
                     </div>
                     <div class="form-group" style="flex: 1; min-width: 120px;">
                         <label class="form-label">Unit Price</label>
-                        <input type="number" class="form-control" @bind="_editProduct.UnitPrice" step="0.01" min="0" />
+                        <input type="number" class="form-control" @bind="DataToUpsert!.UnitPrice" step="0.01" min="0" />
                     </div>
                     <div class="form-group" style="flex: 1; min-width: 120px;">
                         <label class="form-label">Servings/Unit</label>
-                        <input type="number" class="form-control" @bind="_editProduct.ServingsPerUnit" step="1" min="1" placeholder="Optional" />
+                        <input type="number" class="form-control" @bind="DataToUpsert!.ServingsPerUnit" step="1" min="1" placeholder="Optional" />
                     </div>
                 </div>
                 
                 <div class="d-flex gap-md" style="flex-wrap: wrap;">
                     <div class="form-group" style="flex: 1;">
                         <label class="form-label">Barcode (Optional)</label>
-                        <input type="text" class="form-control" @bind="_editProduct.Barcode" placeholder="UPC/EAN" />
+                        <input type="text" class="form-control" @bind="DataToUpsert!.Barcode" placeholder="UPC/EAN" />
                     </div>
                     <div class="form-group" style="flex: 1;">
                         <label class="form-label">SKU (Optional)</label>
-                        <input type="text" class="form-control" @bind="_editProduct.Sku" placeholder="Internal SKU" />
+                        <input type="text" class="form-control" @bind="DataToUpsert!.Sku" placeholder="Internal SKU" />
                     </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">
+                        <input type="checkbox" @bind="DataToUpsert!.IsActive" /> Active
+                    </label>
                 </div>
             </div>
             <div class="modal-footer">
+                @if (!IsNewProduct)
+                {
+                    <button class="btn btn-danger" style="margin-right: auto;" @onclick="DeleteProduct">🗑️ Delete</button>
+                }
                 <button class="btn btn-outline" @onclick="CloseModal">Cancel</button>
                 <button class="btn btn-primary" @onclick="SaveProduct">
-                    @(_editingProduct == null ? "Add Product" : "Save Changes")
+                    @(IsNewProduct ? "Add Product" : "Save Changes")
                 </button>
             </div>
         </div>
@@ -187,160 +211,263 @@
 }
 
 @code {
-    private List<Product> _products = new();
-    private List<ProductCategory> _categories = new();
-    
-    private ProductCategory? _selectedCategory;
-    private string _searchQuery = "";
-    
-    private bool _showProductModal = false;
-    private Product? _editingProduct;
-    private Product _editProduct = new();
-    
-    protected override void OnInitialized()
+    [Inject]
+    private BarInventory.BarDB.Service DbService { get; set; } = default!;
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+
+    // Data Lists
+    protected List<ProductsQueryResult>? ProductList { get; set; } = null;
+
+    // Dropdown Dictionaries - loaded from database
+    protected Dictionary<int, string>? CategoryDropDowns = null;
+    protected Dictionary<int, string>? ContainerTypeDropDowns = null;
+
+    // Filter/Search State
+    protected int? SelectedCategoryId = null;
+    protected string SearchQuery = "";
+    protected string FilterMessage = "";
+
+    // Modal State
+    protected bool ShowProductModal = false;
+    protected bool IsNewProduct = true;
+    protected string? FormErrorMessage = null;
+    protected ProductsUpsertInput? DataToUpsert { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        LoadProducts();
-    }
-    
-    private void LoadProducts()
-    {
-        _products = InventoryService.GetAllProducts();
-        _categories = _products.Select(p => p.Category).Distinct().OrderBy(c => c).ToList();
-    }
-    
-    private List<Product> GetFilteredProducts()
-    {
-        var filtered = _products.AsEnumerable();
-        
-        if (_selectedCategory.HasValue)
-            filtered = filtered.Where(p => p.Category == _selectedCategory.Value);
-        
-        if (!string.IsNullOrWhiteSpace(_searchQuery))
+        if (firstRender)
         {
-            var query = _searchQuery.ToLower();
-            filtered = filtered.Where(p => 
-                p.DisplayName.ToLower().Contains(query) ||
-                p.Brand.ToLower().Contains(query) ||
-                p.Barcode?.ToLower().Contains(query) == true);
+            BuildDropDowns();
+            LoadData();
+            StateHasChanged();
         }
-        
-        return filtered.OrderBy(p => p.Category).ThenBy(p => p.DisplayName).ToList();
     }
-    
-    private void OpenAddProduct()
+
+    protected void BuildDropDowns()
     {
-        _editingProduct = null;
-        _editProduct = new Product
+        // Load Product Categories
+        if (CategoryDropDowns == null)
         {
-            Category = ProductCategory.Liquor,
-            ContainerType = ContainerType.Bottle750ml,
-            SizeDescription = "750ml",
-            IsActive = true
-        };
-        _showProductModal = true;
-    }
-    
-    private void EditProduct(Product product)
-    {
-        _editingProduct = product;
-        _editProduct = new Product
+            CategoryDropDowns = new Dictionary<int, string>();
+            var output = DbService.ProductCategoriesQuery(new ProductCategoriesQueryInput());
+            if (output.ReturnValue == ProductCategoriesQueryOutput.Returns.Ok && output.ResultData != null)
+            {
+                foreach (var item in output.ResultData.OrderBy(x => x.SortOrder))
+                {
+                    CategoryDropDowns.Add(item.Id, item.Name);
+                }
+            }
+        }
+
+        // Load Container Types
+        if (ContainerTypeDropDowns == null)
         {
-            Id = product.Id,
-            Brand = product.Brand,
-            Name = product.Name,
-            Category = product.Category,
-            ContainerType = product.ContainerType,
-            SizeDescription = product.SizeDescription,
-            UnitCost = product.UnitCost,
-            UnitPrice = product.UnitPrice,
-            ServingsPerUnit = product.ServingsPerUnit,
-            Barcode = product.Barcode,
-            Sku = product.Sku,
-            IsActive = product.IsActive
-        };
-        _showProductModal = true;
+            ContainerTypeDropDowns = new Dictionary<int, string>();
+            var output = DbService.ContainerTypesQuery(new ContainerTypesQueryInput());
+            if (output.ReturnValue == ContainerTypesQueryOutput.Returns.Ok && output.ResultData != null)
+            {
+                foreach (var item in output.ResultData.OrderBy(x => x.SortOrder))
+                {
+                    ContainerTypeDropDowns.Add(item.Id, item.Name);
+                }
+            }
+        }
     }
-    
-    private void CloseModal()
+
+    protected void LoadData()
     {
-        _showProductModal = false;
-        _editingProduct = null;
-    }
-    
-    private void SaveProduct()
-    {
-        if (string.IsNullOrWhiteSpace(_editProduct.Brand) && string.IsNullOrWhiteSpace(_editProduct.Name))
-            return;
-        
-        _editProduct.IsActive = true;
-        
-        if (_editingProduct == null)
+        var queryInput = new ProductsQueryInput();
+        var queryOutput = DbService.ProductsQuery(queryInput);
+
+        if (queryOutput.ReturnValue == ProductsQueryOutput.Returns.Ok)
         {
-            InventoryService.AddProduct(_editProduct);
+            ProductList?.Clear();
+            ProductList = queryOutput.ResultData;
+
+            if (ProductList == null || ProductList.Count == 0)
+            {
+                FilterMessage = "No products found";
+                ProductList = null;
+            }
         }
         else
         {
-            InventoryService.UpdateProduct(_editProduct);
+            ProductList = null;
+            FilterMessage = "No products found";
         }
-        
-        LoadProducts();
-        CloseModal();
     }
-    
-    private string GetCategoryIcon(ProductCategory category) => category switch
+
+    protected List<ProductsQueryResult> GetFilteredProducts()
     {
-        ProductCategory.Liquor => "🥃",
-        ProductCategory.Wine => "🍷",
-        ProductCategory.BeerBottle => "🍺",
-        ProductCategory.BeerCan => "🥫",
-        ProductCategory.Seltzer => "✨",
-        ProductCategory.DraftBeer => "🍻",
-        ProductCategory.Mixers => "🧃",
-        _ => "📦"
-    };
-    
-    private string GetCategoryName(ProductCategory category) => category switch
+        if (ProductList == null) return new List<ProductsQueryResult>();
+
+        var filtered = ProductList.AsEnumerable();
+
+        if (SelectedCategoryId.HasValue)
+            filtered = filtered.Where(p => p.Category == SelectedCategoryId.Value);
+
+        if (!string.IsNullOrWhiteSpace(SearchQuery))
+        {
+            var query = SearchQuery.ToLower();
+            filtered = filtered.Where(p =>
+                p.Name.ToLower().Contains(query) ||
+                p.Brand.ToLower().Contains(query) ||
+                p.Barcode?.ToLower().Contains(query) == true);
+        }
+
+        return filtered.OrderBy(p => p.Category).ThenBy(p => p.Brand).ThenBy(p => p.Name).ToList();
+    }
+
+    protected void FilterByCategory(int? categoryId)
     {
-        ProductCategory.Liquor => "Liquor",
-        ProductCategory.Wine => "Wine",
-        ProductCategory.BeerBottle => "Beer (Bottles)",
-        ProductCategory.BeerCan => "Beer (Cans)",
-        ProductCategory.Seltzer => "Seltzers",
-        ProductCategory.DraftBeer => "Draft Beer",
-        ProductCategory.Mixers => "Mixers",
-        ProductCategory.Other => "Other",
-        _ => category.ToString()
-    };
-    
-    private string GetCategoryBadgeClass(ProductCategory category) => category switch
+        SelectedCategoryId = categoryId;
+    }
+
+    protected void OpenAddProduct()
     {
-        ProductCategory.Liquor => "badge-liquor",
-        ProductCategory.Wine => "badge-wine",
-        ProductCategory.BeerBottle => "badge-beer-bottle",
-        ProductCategory.BeerCan => "badge-beer-can",
-        ProductCategory.Seltzer => "badge-seltzer",
-        ProductCategory.DraftBeer => "badge-draft",
-        _ => ""
-    };
-    
-    private string GetContainerName(ContainerType container) => container switch
+        IsNewProduct = true;
+        FormErrorMessage = null;
+        DataToUpsert = new ProductsUpsertInput
+        {
+            Id = 0,
+            Name = "",
+            Brand = "",
+            Category = CategoryDropDowns?.Keys.FirstOrDefault() ?? 1,
+            ContainerType = ContainerTypeDropDowns?.Keys.FirstOrDefault() ?? 0,
+            SizeDescription = "750ml",
+            UnitCost = 0,
+            UnitPrice = 0,
+            ServingsPerUnit = null,
+            Barcode = null,
+            Sku = null,
+            IsActive = true,
+            SortOrder = 0
+        };
+        ShowProductModal = true;
+    }
+
+    protected void EditProduct(ProductsQueryResult product)
     {
-        ContainerType.Bottle750ml => "750ml Bottle",
-        ContainerType.Bottle1L => "1L Bottle",
-        ContainerType.Bottle1_75L => "1.75L Bottle",
-        ContainerType.Bottle375ml => "375ml Bottle",
-        ContainerType.Can12oz => "12oz Can",
-        ContainerType.Can16oz => "16oz Can",
-        ContainerType.Can19_2oz => "19.2oz Can",
-        ContainerType.Bottle12oz => "12oz Bottle",
-        ContainerType.Bottle22oz => "22oz Bottle",
-        ContainerType.KegHalfBarrel => "1/2 Barrel Keg",
-        ContainerType.KegQuarterBarrel => "1/4 Barrel Keg",
-        ContainerType.KegSixtel => "1/6 Barrel (Sixtel)",
-        ContainerType.WineBottle750ml => "750ml Wine Bottle",
-        ContainerType.WineBottle1_5L => "1.5L Wine Bottle",
-        ContainerType.BoxWine3L => "3L Box Wine",
-        ContainerType.Other => "Other",
-        _ => container.ToString()
-    };
+        IsNewProduct = false;
+        FormErrorMessage = null;
+
+        // Load fresh data by ID
+        var output = DbService.ProductsById(new ProductsByIdInput { Id = product.Id });
+        if (output.ReturnValue == ProductsByIdOutput.Returns.Ok && output.ResultData != null)
+        {
+            var p = output.ResultData;
+            DataToUpsert = new ProductsUpsertInput
+            {
+                Id = p.Id,
+                Name = p.Name,
+                Brand = p.Brand,
+                Category = p.Category,
+                ContainerType = p.ContainerType,
+                SizeDescription = p.SizeDescription,
+                UnitCost = p.UnitCost,
+                UnitPrice = p.UnitPrice,
+                ServingsPerUnit = p.ServingsPerUnit,
+                Barcode = p.Barcode,
+                Sku = p.Sku,
+                IsActive = p.IsActive,
+                SortOrder = p.SortOrder
+            };
+            ShowProductModal = true;
+        }
+    }
+
+    protected void CloseModal()
+    {
+        ShowProductModal = false;
+        DataToUpsert = null;
+        FormErrorMessage = null;
+    }
+
+    protected void SaveProduct()
+    {
+        if (DataToUpsert == null) return;
+
+        if (string.IsNullOrWhiteSpace(DataToUpsert.Brand) && string.IsNullOrWhiteSpace(DataToUpsert.Name))
+        {
+            FormErrorMessage = "Brand or Name is required.";
+            return;
+        }
+
+        if (!DataToUpsert.IsValid())
+        {
+            FormErrorMessage = string.Join(" ", DataToUpsert.ValidationResults.Select(item => item));
+            return;
+        }
+
+        var output = DbService.ProductsUpsert(DataToUpsert);
+        if (output.ReturnValue == ProductsUpsertOutput.Returns.Ok)
+        {
+            LoadData();
+            CloseModal();
+        }
+        else
+        {
+            FormErrorMessage = output.ReturnValue switch
+            {
+                ProductsUpsertOutput.Returns.InsertError => "Error inserting product.",
+                ProductsUpsertOutput.Returns.UpdateError => "Error updating product.",
+                _ => "Unknown error occurred."
+            };
+        }
+    }
+
+    protected void DeleteProduct()
+    {
+        if (DataToUpsert?.Id == null || DataToUpsert.Id == 0) return;
+
+        var deleteInput = new ProductsDeleteInput { Id = DataToUpsert.Id.Value };
+        var output = DbService.ProductsDelete(deleteInput);
+
+        if (output.ReturnValue == ProductsDeleteOutput.Returns.Ok)
+        {
+            LoadData();
+            CloseModal();
+        }
+        else
+        {
+            FormErrorMessage = "Error deleting product.";
+        }
+    }
+
+    // Helper methods for display
+    protected string GetCategoryName(int categoryId)
+    {
+        if (CategoryDropDowns != null && CategoryDropDowns.TryGetValue(categoryId, out var name))
+            return name;
+        return "Unknown";
+    }
+
+    protected string GetCategoryIcon(int categoryId)
+    {
+        var name = GetCategoryName(categoryId).ToLower();
+        return name switch
+        {
+            "spirits" => "🥃",
+            "wine" => "🍷",
+            "beer" => "🍺",
+            "mixers" => "🧃",
+            "other" => "📦",
+            _ => "📦"
+        };
+    }
+
+    protected string GetCategoryBadgeClass(int categoryId)
+    {
+        var name = GetCategoryName(categoryId).ToLower();
+        return name switch
+        {
+            "spirits" => "badge-liquor",
+            "wine" => "badge-wine",
+            "beer" => "badge-beer-bottle",
+            "mixers" => "badge-mixer",
+            _ => ""
+        };
+    }
 }

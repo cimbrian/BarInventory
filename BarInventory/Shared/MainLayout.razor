@@ -5,7 +5,7 @@
         <div class="nav-container">
             <a href="/" class="nav-brand">
                 <span class="nav-brand-icon">🍸</span>
-                <span class="nav-brand-text">Bar Inventory</span>
+                <span class="nav-brand-text">CzarWare</span>
             </a>
             <div class="nav-links">
                 <NavLink href="/" class="nav-link" Match="NavLinkMatch.All">
@@ -32,6 +32,10 @@
                     <span class="nav-icon">📅</span>
                     <span class="nav-text">Sessions</span>
                 </NavLink>
+                @* <NavLink href="/settings" class="nav-link nav-link-settings">
+                    <span class="nav-icon">⚙️</span>
+                    <span class="nav-text">Settings</span>
+                </NavLink> *@
             </div>
         </div>
     </nav>
@@ -64,5 +68,12 @@
     #blazor-error-ui .reload {
         color: white;
         margin-left: 1rem;
+    }
+    
+    .nav-link-settings {
+        opacity: 0.7;
+    }
+    .nav-link-settings:hover, .nav-link-settings.active {
+        opacity: 1;
     }
 </style>

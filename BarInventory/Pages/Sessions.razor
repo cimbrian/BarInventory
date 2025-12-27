@@ -1,546 +1,788 @@
 @page "/sessions"
-@inject InventoryService InventoryService
+@using BarInventory.BarDB.Models
 
 <PageTitle>Sessions - Bar Inventory</PageTitle>
 
-<div class="page-header">
-    <div class="d-flex justify-between align-center">
-        <div>
-            <h1 class="page-title">Inventory Sessions</h1>
-            <p class="page-subtitle">Create and manage inventory counting periods</p>
-        </div>
-        <button class="btn btn-primary" @onclick="ShowNewSessionModal">
-            + New Session
-        </button>
+<div class="page-header d-flex justify-between align-center" style="flex-wrap: wrap; gap: 1rem;">
+    <div>
+        <h1 class="page-title">Inventory Sessions</h1>
+        <p class="page-subtitle">@(SessionList?.Count ?? 0) sessions</p>
     </div>
+    <button class="btn btn-primary" @onclick="OpenAddSession">
+        ➕ New Session
+    </button>
 </div>
 
-@* Active Session Card *@
-@if (_activeSession != null)
-{
-    <div class="card card-highlight mb-lg">
-        <div class="card-header">
-            <h2 class="card-title">
-                <span class="status-dot status-active"></span>
-                Active Session
-            </h2>
-            <span class="badge badge-success">In Progress</span>
-        </div>
-        <div class="card-body">
-            <div class="session-info-grid">
-                <div class="session-info-item">
-                    <span class="session-info-label">Session Name</span>
-                    <span class="session-info-value">@_activeSession.SessionName</span>
-                </div>
-                <div class="session-info-item">
-                    <span class="session-info-label">Started</span>
-                    <span class="session-info-value">@_activeSession.SessionDate.ToString("MMM d, yyyy h:mm tt")</span>
-                </div>
-                <div class="session-info-item">
-                    <span class="session-info-label">Frequency</span>
-                    <span class="session-info-value">@_activeSession.Frequency</span>
-                </div>
-                <div class="session-info-item">
-                    <span class="session-info-label">Counted By</span>
-                    <span class="session-info-value">@(string.IsNullOrEmpty(_activeSession.CountedBy) ? "Not specified" : _activeSession.CountedBy)</span>
-                </div>
-            </div>
-            
-            @* Progress *@
-            <div class="mt-md">
-                <div class="d-flex justify-between mb-xs">
-                    <span class="text-secondary">Inventory Progress</span>
-                    <span class="text-primary">@_countedItems / @_totalItems products</span>
-                </div>
-                <div class="progress-bar">
-                    <div class="progress-fill" style="width: @((_totalItems > 0 ? (_countedItems / (decimal)_totalItems) * 100 : 0))%"></div>
-                </div>
-            </div>
-            
-            <div class="d-flex gap-sm mt-md" style="flex-wrap: wrap;">
-                <a href="/capture" class="btn btn-primary">
-                    📝 Continue Counting
-                </a>
-                <button class="btn btn-secondary" @onclick="ShowCompleteConfirm">
-                    ✓ Complete Session
-                </button>
-                <button class="btn btn-outline" @onclick="() => ShowEditSession(_activeSession)">
-                    ✎ Edit
-                </button>
-            </div>
-        </div>
-    </div>
-}
-else
-{
-    <div class="card mb-lg">
-        <div class="card-body">
-            <div class="empty-state">
-                <div class="empty-state-icon">📋</div>
-                <h2 class="empty-state-title">No Active Session</h2>
-                <p class="empty-state-text">Start a new inventory session to begin counting products.</p>
-                <button class="btn btn-primary btn-lg" @onclick="ShowNewSessionModal">
-                    + Start New Session
-                </button>
-            </div>
-        </div>
-    </div>
-}
+@* Filter Tabs *@
+<div class="category-pills mb-md">
+    <button class='category-pill @(ShowCompleted == null ? "active" : "")' @onclick="() => ShowCompleted = null">
+        All (@(SessionList?.Count ?? 0))
+    </button>
+    <button class='category-pill @(ShowCompleted == false ? "active" : "")' @onclick="() => ShowCompleted = false">
+        🔄 Active (@(SessionList?.Count(s => !s.IsComplete) ?? 0))
+    </button>
+    <button class='category-pill @(ShowCompleted == true ? "active" : "")' @onclick="() => ShowCompleted = true">
+        ✅ Completed (@(SessionList?.Count(s => s.IsComplete) ?? 0))
+    </button>
+</div>
 
-@* Session History *@
+@* Sessions Table *@
 <div class="card">
-    <div class="card-header">
-        <h2 class="card-title">Session History</h2>
-        <span class="text-secondary">@_completedSessions.Count completed sessions</span>
-    </div>
-    <div class="card-body">
-        @if (_completedSessions.Count == 0)
-        {
-            <div class="empty-state">
-                <div class="empty-state-icon">📜</div>
-                <p class="empty-state-text">No completed sessions yet.</p>
-            </div>
-        }
-        else
-        {
-            <div class="table-responsive">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 80px;">Actions</th>
-                            <th>Session</th>
-                            <th>Date</th>
-                            <th>Completed</th>
-                            <th>Frequency</th>
-                            <th>Products</th>
-                            <th>Variance</th>
+    <div class="card-body" style="padding: 0;">
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 80px;"></th>
+                        <th>Session</th>
+                        <th>Date</th>
+                        <th>Frequency</th>
+                        <th>Counted By</th>
+                        <th>Status</th>
+                        <th class="number">Items</th>
+                        <th class="number">Losses</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var session in GetFilteredSessions())
+                    {
+                        var itemCount = GetSessionItemCount(session.Id);
+                        var lossCount = GetSessionLossCount(session.Id);
+                        <tr class="clickable-row" @onclick="() => OpenSessionSummary(session)">
+                            <td @onclick:stopPropagation="true">
+                                <button class="btn btn-ghost btn-sm" @onclick="() => EditSession(session)" title="Edit">✏️</button>
+                                <button class="btn btn-ghost btn-sm" @onclick="() => OpenSessionSummary(session)" title="View Summary">📊</button>
+                            </td>
+                            <td>
+                                <div style="font-weight: 500;">@session.SessionName</div>
+                                @if (!string.IsNullOrEmpty(session.Notes))
+                                {
+                                    <div class="text-muted" style="font-size: 0.8rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@session.Notes</div>
+                                }
+                            </td>
+                            <td>@session.SessionDate.ToString("MMM dd, yyyy")</td>
+                            <td>@GetFrequencyName(session.Frequency)</td>
+                            <td>@(string.IsNullOrEmpty(session.CountedBy) ? "-" : session.CountedBy)</td>
+                            <td>
+                                @if (session.IsComplete)
+                                {
+                                    <span class="item-badge badge-success">✅ Complete</span>
+                                    @if (session.CompletedAt.HasValue)
+                                    {
+                                        <div class="text-muted" style="font-size: 0.75rem;">@session.CompletedAt.Value.ToString("MMM dd, h:mm tt")</div>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="item-badge badge-warning">🔄 In Progress</span>
+                                }
+                            </td>
+                            <td class="number">@itemCount</td>
+                            <td class="number">@(lossCount > 0 ? lossCount.ToString() : "-")</td>
                         </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var session in _completedSessions)
-                        {
-                            var summary = InventoryService.GetSessionSummary(session.Id);
-                            <tr>
-                                <td>
-                                    <div class="d-flex gap-xs">
-                                        <button class="btn btn-sm btn-outline" @onclick="() => ViewSession(session.Id)" title="View Details">
-                                            👁
-                                        </button>
-                                        <button class="btn btn-sm btn-outline" @onclick="() => ShowDeleteConfirm(session)" title="Delete">
-                                            🗑
-                                        </button>
-                                    </div>
-                                </td>
-                                <td>
-                                    <strong>@session.SessionName</strong>
-                                    @if (!string.IsNullOrEmpty(session.CountedBy))
-                                    {
-                                        <br/><span class="text-muted text-sm">by @session.CountedBy</span>
-                                    }
-                                </td>
-                                <td>@session.SessionDate.ToString("MMM d, yyyy")</td>
-                                <td>@session.CompletedAt?.ToString("MMM d, h:mm tt")</td>
-                                <td>
-                                    <span class="badge badge-secondary">@session.Frequency</span>
-                                </td>
-                                <td>@summary.ProductsCounted / @summary.TotalProducts</td>
-                                <td>
-                                    @if (summary.TotalVarianceValue != 0)
-                                    {
-                                        <span class='@(summary.TotalVarianceValue > 0 ? "text-danger" : "text-success")'>
-                                            @(summary.TotalVarianceValue > 0 ? "+" : "")$@summary.TotalVarianceValue.ToString("0.00")
-                                        </span>
-                                    }
-                                    else
-                                    {
-                                        <span class="text-muted">$0.00</span>
-                                    }
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        }
+                    }
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
-@* New/Edit Session Modal *@
-@if (_showSessionModal)
+@if (!GetFilteredSessions().Any())
 {
-    <div class="modal-backdrop" @onclick="CloseModals"></div>
-    <div class="modal">
-        <div class="modal-header">
-            <h2 class="modal-title">@(_editingSession == null ? "New Inventory Session" : "Edit Session")</h2>
-            <button class="modal-close" @onclick="CloseModals">×</button>
-        </div>
-        <div class="modal-body">
-            <div class="form-group">
-                <label class="form-label">Session Name</label>
-                <input type="text" class="form-control" @bind="_sessionForm.SessionName" 
-                       placeholder="e.g., Week 1 - January 2024" />
+    <div class="empty-state mt-lg">
+        <div class="empty-state-icon">📋</div>
+        <h2 class="empty-state-title">No Sessions Found</h2>
+        <p class="empty-state-text">@FilterMessage</p>
+    </div>
+}
+
+@* Add/Edit Session Modal *@
+@if (ShowSessionModal)
+{
+    <div class="modal-backdrop" @onclick="CloseModal">
+        <div class="modal" @onclick:stopPropagation="true" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 class="modal-title">@(IsNewSession ? "New Session" : "Edit Session")</h3>
+                <button class="modal-close" @onclick="CloseModal">×</button>
             </div>
-            
-            <div class="form-group">
-                <label class="form-label">Session Date</label>
-                <input type="datetime-local" class="form-control" @bind="_sessionForm.SessionDate" />
-            </div>
-            
-            <div class="form-group">
-                <label class="form-label">Frequency</label>
-                <select class="form-control" @bind="_sessionForm.Frequency">
-                    @foreach (var freq in Enum.GetValues<InventoryFrequency>())
-                    {
-                        <option value="@freq">@freq</option>
-                    }
-                </select>
-            </div>
-            
-            <div class="form-group">
-                <label class="form-label">Counted By</label>
-                <input type="text" class="form-control" @bind="_sessionForm.CountedBy" 
-                       placeholder="Staff member name" />
-            </div>
-            
-            <div class="form-group">
-                <label class="form-label">Notes (optional)</label>
-                <textarea class="form-control" rows="3" @bind="_sessionForm.Notes" 
-                          placeholder="Any notes about this inventory session..."></textarea>
-            </div>
-            
-            @if (_editingSession == null)
-            {
+            <div class="modal-body">
+                @if (!string.IsNullOrEmpty(FormErrorMessage))
+                {
+                    <div class="alert alert-danger mb-md">@FormErrorMessage</div>
+                }
+                
+                <div class="form-group">
+                    <label class="form-label">Session Name</label>
+                    <input type="text" class="form-control" @bind="DataToUpsert!.SessionName" placeholder="e.g., Week 52 - December 2025" />
+                </div>
+                
+                <div class="d-flex gap-md" style="flex-wrap: wrap;">
+                    <div class="form-group" style="flex: 1; min-width: 150px;">
+                        <label class="form-label">Session Date</label>
+                        <input type="date" class="form-control" @bind="DataToUpsert!.SessionDate" />
+                    </div>
+                    <div class="form-group" style="flex: 1; min-width: 150px;">
+                        <label class="form-label">Frequency</label>
+                        <select class="form-control" @bind="DataToUpsert!.Frequency">
+                            @if (FrequencyDropDowns != null)
+                            {
+                                @foreach (var freq in FrequencyDropDowns)
+                                {
+                                    <option value="@freq.Key">@freq.Value</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Counted By</label>
+                    <input type="text" class="form-control" @bind="DataToUpsert!.CountedBy" placeholder="Name of person counting" />
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Notes (Optional)</label>
+                    <textarea class="form-control" rows="3" @bind="DataToUpsert!.Notes" placeholder="Any notes about this session..."></textarea>
+                </div>
+                
                 <div class="form-group">
                     <label class="form-label">
-                        <input type="checkbox" @bind="_copyPreviousData" />
-                        Copy starting quantities from previous session
+                        <input type="checkbox" @bind="DataToUpsert!.IsComplete" /> Mark as Complete
                     </label>
                 </div>
-            }
-        </div>
-        <div class="modal-footer">
-            <button class="btn btn-outline" @onclick="CloseModals">Cancel</button>
-            <button class="btn btn-primary" @onclick="SaveSession">
-                @(_editingSession == null ? "Create Session" : "Save Changes")
-            </button>
-        </div>
-    </div>
-}
-
-@* Complete Confirmation Modal *@
-@if (_showCompleteConfirm)
-{
-    <div class="modal-backdrop" @onclick="CloseModals"></div>
-    <div class="modal">
-        <div class="modal-header">
-            <h2 class="modal-title">Complete Session?</h2>
-            <button class="modal-close" @onclick="CloseModals">×</button>
-        </div>
-        <div class="modal-body">
-            <p>Are you sure you want to complete this inventory session?</p>
-            <p class="text-warning mt-sm">
-                ⚠️ Once completed, the session cannot be edited. Make sure all counts are finalized.
-            </p>
-            @if (_countedItems < _totalItems)
-            {
-                <div class="alert alert-warning mt-md">
-                    <strong>Warning:</strong> Only @_countedItems of @_totalItems products have been counted.
-                </div>
-            }
-        </div>
-        <div class="modal-footer">
-            <button class="btn btn-outline" @onclick="CloseModals">Cancel</button>
-            <button class="btn btn-success" @onclick="CompleteSession">
-                ✓ Complete Session
-            </button>
+            </div>
+            <div class="modal-footer">
+                @if (!IsNewSession)
+                {
+                    <button class="btn btn-danger" style="margin-right: auto;" @onclick="DeleteSession">🗑️ Delete</button>
+                }
+                <button class="btn btn-outline" @onclick="CloseModal">Cancel</button>
+                <button class="btn btn-primary" @onclick="SaveSession">
+                    @(IsNewSession ? "Create Session" : "Save Changes")
+                </button>
+            </div>
         </div>
     </div>
 }
 
-@* Delete Confirmation Modal *@
-@if (_showDeleteConfirm && _sessionToDelete != null)
+@* Session Summary Modal *@
+@if (ShowSummaryModal && SelectedSession != null)
 {
-    <div class="modal-backdrop" @onclick="CloseModals"></div>
-    <div class="modal">
-        <div class="modal-header">
-            <h2 class="modal-title">Delete Session?</h2>
-            <button class="modal-close" @onclick="CloseModals">×</button>
-        </div>
-        <div class="modal-body">
-            <p>Are you sure you want to delete <strong>@_sessionToDelete.SessionName</strong>?</p>
-            <p class="text-danger mt-sm">
-                ⚠️ This action cannot be undone. All inventory data for this session will be permanently deleted.
-            </p>
-        </div>
-        <div class="modal-footer">
-            <button class="btn btn-outline" @onclick="CloseModals">Cancel</button>
-            <button class="btn btn-danger" @onclick="DeleteSession">
-                🗑 Delete Session
-            </button>
-        </div>
-    </div>
-}
-
-@* View Session Details Modal *@
-@if (_showViewModal && _viewingSession != null)
-{
-    <div class="modal-backdrop" @onclick="CloseModals"></div>
-    <div class="modal" style="max-width: 700px;">
-        <div class="modal-header">
-            <h2 class="modal-title">📊 @_viewingSession.SessionName</h2>
-            <button class="modal-close" @onclick="CloseModals">×</button>
-        </div>
-        <div class="modal-body">
-            @* Session Info *@
-            <div class="session-info-grid mb-md">
-                <div class="session-info-item">
-                    <span class="session-info-label">Date</span>
-                    <span class="session-info-value">@_viewingSession.SessionDate.ToString("MMM d, yyyy")</span>
-                </div>
-                <div class="session-info-item">
-                    <span class="session-info-label">Completed</span>
-                    <span class="session-info-value">@_viewingSession.CompletedAt?.ToString("MMM d, h:mm tt")</span>
-                </div>
-                <div class="session-info-item">
-                    <span class="session-info-label">Counted By</span>
-                    <span class="session-info-value">@(string.IsNullOrEmpty(_viewingSession.CountedBy) ? "—" : _viewingSession.CountedBy)</span>
-                </div>
-                <div class="session-info-item">
-                    <span class="session-info-label">Frequency</span>
-                    <span class="session-info-value">@_viewingSession.Frequency</span>
+    <div class="modal-backdrop" @onclick="CloseSummaryModal">
+        <div class="modal session-summary-modal" @onclick:stopPropagation="true" style="max-width: 900px; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header">
+                <h3 class="modal-title">📊 @SelectedSession.SessionName</h3>
+                <div class="d-flex gap-sm">
+                    <a href="/session-report/@SelectedSession.Id" class="btn btn-outline btn-sm" target="_blank" title="Open Printable Report">🖨️ Print Report</a>
+                    <button class="modal-close" @onclick="CloseSummaryModal">×</button>
                 </div>
             </div>
-            
-            @* Summary Stats *@
-            <div class="stat-grid mb-md">
-                <div class="stat-card">
-                    <span class="stat-label">Products Counted</span>
-                    <span class="stat-value">@_viewSummary.ProductsCounted / @_viewSummary.TotalProducts</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-label">Inventory Value</span>
-                    <span class="stat-value">@_viewSummary.TotalInventoryValue.ToString("C0")</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-label">Total Variance</span>
-                    <span class='stat-value @(_viewSummary.TotalVarianceValue > 0 ? "text-danger" : _viewSummary.TotalVarianceValue < 0 ? "text-success" : "")'>
-                        @(_viewSummary.TotalVarianceValue > 0 ? "+" : "")@_viewSummary.TotalVarianceValue.ToString("C2")
-                    </span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-label">Losses Recorded</span>
-                    <span class="stat-value text-warning">@_viewSummary.TotalLossValue.ToString("C2")</span>
-                </div>
-            </div>
-            
-            @* Variance Alerts *@
-            @if (_viewSummary.Alerts.Any())
-            {
-                <h4 class="mb-sm">⚠️ Variance Alerts (@_viewSummary.Alerts.Count)</h4>
-                <div style="max-height: 200px; overflow-y: auto; background: var(--bg-tertiary); border-radius: var(--radius-md); padding: var(--spacing-sm);">
-                    @foreach (var alert in _viewSummary.Alerts.Take(10))
+            <div class="modal-body" id="session-report">
+                @* Session Header Info *@
+                <div class="summary-header mb-lg">
+                    <div class="summary-meta">
+                        <div><strong>Date:</strong> @SelectedSession.SessionDate.ToString("dddd, MMMM dd, yyyy")</div>
+                        <div><strong>Counted By:</strong> @(string.IsNullOrEmpty(SelectedSession.CountedBy) ? "N/A" : SelectedSession.CountedBy)</div>
+                        <div><strong>Status:</strong> @(SelectedSession.IsComplete ? "✅ Completed" : "🔄 In Progress")</div>
+                        @if (SelectedSession.CompletedAt.HasValue)
+                        {
+                            <div><strong>Completed:</strong> @SelectedSession.CompletedAt.Value.ToString("MMM dd, yyyy h:mm tt")</div>
+                        }
+                    </div>
+                    @if (!string.IsNullOrEmpty(SelectedSession.Notes))
                     {
-                        <div class="d-flex justify-between align-center" style="padding: var(--spacing-xs) 0; border-bottom: 1px solid var(--border-primary);">
-                            <span>@alert.Product?.DisplayName</span>
-                            <span class='@(alert.VarianceAmount > 0 ? "text-danger" : "text-success")'>
-                                @(alert.VarianceAmount > 0 ? "+" : "")@alert.VarianceAmount.ToString("0.0") units
-                            </span>
-                        </div>
-                    }
-                    @if (_viewSummary.Alerts.Count > 10)
-                    {
-                        <div class="text-muted text-center mt-sm">
-                            + @(_viewSummary.Alerts.Count - 10) more...
+                        <div class="summary-notes mt-sm">
+                            <strong>Notes:</strong> @SelectedSession.Notes
                         </div>
                     }
                 </div>
-            }
-            else
-            {
-                <div class="text-success">✓ No significant variances</div>
-            }
-            
-            @if (!string.IsNullOrEmpty(_viewingSession.Notes))
-            {
-                <h4 class="mt-md mb-sm">📝 Notes</h4>
-                <p class="text-secondary">@_viewingSession.Notes</p>
-            }
-        </div>
-        <div class="modal-footer">
-            <button class="btn btn-outline" @onclick="CloseModals">Close</button>
-            <a href="/lookup" class="btn btn-primary">View Full Details</a>
+                
+                @* Summary Stats *@
+                <div class="stats-grid mb-lg">
+                    <StatCard Label="Products Counted" Value="@SummaryItems.Count.ToString()" />
+                    <StatCard Label="Total On Hand" Value="@SummaryTotalOnHand.ToString("0.0")" />
+                    <StatCard Label="Total Received" Value="@SummaryItems.Sum(i => i.ReceivedQuantity).ToString("0.0")" />
+                    <StatCard Label="Received Cost" Value="@SummaryItems.Sum(i => i.ReceivedCost).ToString("C0")" />
+                </div>
+                
+                <div class="stats-grid mb-lg">
+                    <StatCard Label="Losses Recorded" Value="@SummaryLosses.Count.ToString()" />
+                    <StatCard Label="Total Loss Value" Value="@SummaryLosses.Sum(l => l.EstimatedValue).ToString("C2")" ValueClass="warning" />
+                    <StatCard Label="Variance Items" Value="@SummaryVarianceCount.ToString()" ValueClass="@(SummaryVarianceCount > 0 ? "danger" : "")" />
+                    <StatCard Label="Inventory Value" Value="@SummaryInventoryValue.ToString("C0")" />
+                </div>
+                
+                @* Inventory Counts by Category *@
+                <div class="card mb-lg">
+                    <div class="card-header">
+                        <h4 class="card-title">📦 Inventory Counts</h4>
+                    </div>
+                    <div class="card-body" style="padding: 0;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th class="number">Start</th>
+                                    <th class="number">Recv'd</th>
+                                    <th class="number">Available</th>
+                                    <th class="number">Counted</th>
+                                    <th class="number">Variance</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in SummaryItems.OrderBy(i => GetProduct(i.ProductId)?.Category).ThenBy(i => GetProduct(i.ProductId)?.Name))
+                                {
+                                    var product = GetProduct(item.ProductId);
+                                    var counted = GetItemTotalCount(item.Id);
+                                    var available = item.StartingQuantity + item.ReceivedQuantity;
+                                    var variance = counted - available + item.ComputerSold;
+                                    <tr class='@(Math.Abs(variance) > 0.5m ? "variance-row" : "")'>
+                                        <td>
+                                            <span class="category-icon-sm">@GetCategoryIcon(product?.Category ?? 0)</span>
+                                            @product?.Brand @product?.Name
+                                            <span class="text-muted">(@product?.SizeDescription)</span>
+                                        </td>
+                                        <td class="number">@item.StartingQuantity.ToString("0.0")</td>
+                                        <td class="number">@item.ReceivedQuantity.ToString("0.0")</td>
+                                        <td class="number">@available.ToString("0.0")</td>
+                                        <td class="number"><strong>@counted.ToString("0.0")</strong></td>
+                                        <td class='number @(variance < -0.5m ? "text-danger" : variance > 0.5m ? "text-success" : "")'>
+                                            @(variance > 0 ? "+" : "")@variance.ToString("0.0")
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot>
+                                <tr style="font-weight: 600; background: var(--bg-tertiary);">
+                                    <td>Totals</td>
+                                    <td class="number">@SummaryItems.Sum(i => i.StartingQuantity).ToString("0.0")</td>
+                                    <td class="number">@SummaryItems.Sum(i => i.ReceivedQuantity).ToString("0.0")</td>
+                                    <td class="number">@SummaryItems.Sum(i => i.StartingQuantity + i.ReceivedQuantity).ToString("0.0")</td>
+                                    <td class="number">@SummaryTotalOnHand.ToString("0.0")</td>
+                                    <td class="number">-</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+                
+                @* Losses *@
+                @if (SummaryLosses.Any())
+                {
+                    <div class="card mb-lg">
+                        <div class="card-header">
+                            <h4 class="card-title">📉 Losses Recorded</h4>
+                        </div>
+                        <div class="card-body" style="padding: 0;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Time</th>
+                                        <th>Type</th>
+                                        <th>Product</th>
+                                        <th class="number">Qty</th>
+                                        <th class="number">Value</th>
+                                        <th>Reason</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var loss in SummaryLosses.OrderByDescending(l => l.OccurredAt))
+                                    {
+                                        var product = GetProduct(loss.ProductId);
+                                        <tr>
+                                            <td>@loss.OccurredAt.ToString("M/d h:mm tt")</td>
+                                            <td>
+                                                <span>@GetLossTypeIcon(loss.LossType)</span>
+                                                @GetLossTypeName(loss.LossType)
+                                            </td>
+                                            <td>@product?.Brand @product?.Name</td>
+                                            <td class="number">@loss.Quantity.ToString("0.0")</td>
+                                            <td class="number text-danger">@loss.EstimatedValue.ToString("C2")</td>
+                                            <td class="text-muted">@(loss.Reason ?? "—")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                                <tfoot>
+                                    <tr style="font-weight: 600; background: var(--bg-tertiary);">
+                                        <td colspan="3">Total Losses</td>
+                                        <td class="number">@SummaryLosses.Sum(l => l.Quantity).ToString("0.0")</td>
+                                        <td class="number text-danger">@SummaryLosses.Sum(l => l.EstimatedValue).ToString("C2")</td>
+                                        <td></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                }
+                
+                @* Area Breakdown *@
+                @if (SummaryAreaCounts.Any())
+                {
+                    <div class="card">
+                        <div class="card-header">
+                            <h4 class="card-title">📍 Counts by Area</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="area-summary-grid">
+                                @foreach (var area in Areas.Where(a => SummaryAreaCounts.Any(c => c.AreaId == a.Id)))
+                                {
+                                    var areaCounts = SummaryAreaCounts.Where(c => c.AreaId == area.Id).ToList();
+                                    var areaTotal = areaCounts.Sum(c => c.FullUnits + (c.HasPartial ? c.PartialAmount / 10m : 0));
+                                    <div class="area-summary-card">
+                                        <div class="area-summary-name">@area.Name</div>
+                                        <div class="area-summary-count">@areaTotal.ToString("0.0")</div>
+                                        <div class="area-summary-items">@areaCounts.Count items</div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+                
+                @* Report Footer *@
+                <div class="report-footer mt-lg text-muted" style="text-align: center; font-size: 0.85rem;">
+                    <p>Report generated: @DateTime.Now.ToString("MMMM dd, yyyy h:mm tt")</p>
+                    <p>Bar Inventory System</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" @onclick="CloseSummaryModal">Close</button>
+                @if (!SelectedSession.IsComplete)
+                {
+                    <a href="/capture" class="btn btn-primary">Continue Counting →</a>
+                }
+            </div>
         </div>
     </div>
 }
+
+<style>
+    .clickable-row { cursor: pointer; }
+    .clickable-row:hover { background: var(--bg-tertiary); }
+    
+    .summary-header {
+        background: var(--bg-tertiary);
+        padding: 1rem;
+        border-radius: var(--radius-md);
+    }
+    
+    .summary-meta {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 0.5rem;
+    }
+    
+    .summary-notes {
+        padding-top: 0.75rem;
+        border-top: 1px solid var(--border-primary);
+        font-style: italic;
+    }
+    
+    .variance-row {
+        background: rgba(255, 152, 0, 0.1) !important;
+    }
+    
+    .category-icon-sm {
+        font-size: 1rem;
+        margin-right: 0.25rem;
+    }
+    
+    .area-summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 1rem;
+    }
+    
+    .area-summary-card {
+        background: var(--bg-tertiary);
+        padding: 1rem;
+        border-radius: var(--radius-md);
+        text-align: center;
+    }
+    
+    .area-summary-name {
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+    }
+    
+    .area-summary-count {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--accent-blue);
+    }
+    
+    .area-summary-items {
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+    }
+    
+    .session-summary-modal {
+        width: 95%;
+    }
+    
+    .report-footer {
+        border-top: 1px solid var(--border-primary);
+        padding-top: 1rem;
+    }
+    
+    @@media print {
+        .modal-backdrop {
+            position: static;
+            background: white;
+        }
+        .modal {
+            position: static;
+            max-width: 100%;
+            max-height: none;
+            box-shadow: none;
+            border: none;
+        }
+        .modal-header button,
+        .modal-footer {
+            display: none !important;
+        }
+        .card {
+            break-inside: avoid;
+        }
+        .stats-grid {
+            grid-template-columns: repeat(4, 1fr);
+        }
+    }
+</style>
 
 @code {
-    private InventorySession? _activeSession;
-    private List<InventorySession> _completedSessions = new();
-    private int _countedItems;
-    private int _totalItems;
-    
-    // Modal state
-    private bool _showSessionModal;
-    private bool _showCompleteConfirm;
-    private bool _showDeleteConfirm;
-    private bool _showViewModal;
-    private InventorySession? _editingSession;
-    private InventorySession? _sessionToDelete;
-    private InventorySession? _viewingSession;
-    private InventorySummary _viewSummary = new();
-    private bool _copyPreviousData = true;
-    
-    // Form
-    private SessionFormModel _sessionForm = new();
-    
-    protected override void OnInitialized()
+    [Inject] private BarInventory.BarDB.Service DbService { get; set; } = default!;
+    [Inject] private NavigationManager NavigationManager { get; set; } = default!;
+
+    // Data Lists
+    protected List<InventorySessionsQueryResult>? SessionList { get; set; } = null;
+    protected List<InventoryItemsQueryResult> AllItems = new();
+    protected List<LossRecordsQueryResult> AllLosses = new();
+    protected List<AreaCountsQueryResult> AllAreaCounts = new();
+    protected List<InventoryAreasQueryResult> Areas = new();
+
+    // Dropdown Dictionaries
+    protected Dictionary<int, string>? FrequencyDropDowns = null;
+    protected Dictionary<int, string> LossTypeNames = new();
+    protected Dictionary<int, string> CategoryNames = new();
+    protected Dictionary<int, ProductsQueryResult> ProductCache = new();
+
+    // Filter State
+    protected bool? ShowCompleted = null;
+    protected string FilterMessage = "";
+
+    // Modal State
+    protected bool ShowSessionModal = false;
+    protected bool IsNewSession = true;
+    protected string? FormErrorMessage = null;
+    protected InventorySessionsUpsertInput? DataToUpsert { get; set; }
+
+    // Summary Modal State
+    protected bool ShowSummaryModal = false;
+    protected InventorySessionsQueryResult? SelectedSession = null;
+    protected List<InventoryItemsQueryResult> SummaryItems = new();
+    protected List<LossRecordsQueryResult> SummaryLosses = new();
+    protected List<AreaCountsQueryResult> SummaryAreaCounts = new();
+    protected decimal SummaryTotalOnHand = 0;
+    protected decimal SummaryInventoryValue = 0;
+    protected int SummaryVarianceCount = 0;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        LoadData();
-    }
-    
-    private void LoadData()
-    {
-        _activeSession = InventoryService.GetCurrentSession();
-        _completedSessions = InventoryService.GetAllSessions()
-            .Where(s => s.IsComplete)
-            .ToList();
-        
-        if (_activeSession != null)
+        if (firstRender)
         {
-            var items = InventoryService.GetSessionItems(_activeSession.Id);
-            _totalItems = items.Count;
-            _countedItems = items.Count(i => i.LastCountedAt.HasValue);
+            BuildDropDowns();
+            LoadData();
+            StateHasChanged();
         }
     }
-    
-    private void ShowNewSessionModal()
+
+    protected void BuildDropDowns()
     {
-        _editingSession = null;
-        _sessionForm = new SessionFormModel
+        // Frequencies
+        if (FrequencyDropDowns == null)
         {
-            SessionName = GenerateSessionName(),
-            SessionDate = DateTime.Now,
-            Frequency = InventoryFrequency.Weekly
-        };
-        _showSessionModal = true;
-    }
-    
-    private void ShowEditSession(InventorySession session)
-    {
-        _editingSession = session;
-        _sessionForm = new SessionFormModel
-        {
-            SessionName = session.SessionName,
-            SessionDate = session.SessionDate,
-            Frequency = session.Frequency,
-            CountedBy = session.CountedBy,
-            Notes = session.Notes
-        };
-        _showSessionModal = true;
-    }
-    
-    private void ShowCompleteConfirm()
-    {
-        _showCompleteConfirm = true;
-    }
-    
-    private void ShowDeleteConfirm(InventorySession session)
-    {
-        _sessionToDelete = session;
-        _showDeleteConfirm = true;
-    }
-    
-    private void CloseModals()
-    {
-        _showSessionModal = false;
-        _showCompleteConfirm = false;
-        _showDeleteConfirm = false;
-        _showViewModal = false;
-        _editingSession = null;
-        _sessionToDelete = null;
-        _viewingSession = null;
-    }
-    
-    private void SaveSession()
-    {
-        if (string.IsNullOrWhiteSpace(_sessionForm.SessionName))
-        {
-            return;
+            FrequencyDropDowns = new Dictionary<int, string>();
+            var output = DbService.InventoryFrequenciesQuery(new InventoryFrequenciesQueryInput());
+            if (output.ReturnValue == InventoryFrequenciesQueryOutput.Returns.Ok && output.ResultData != null)
+            {
+                foreach (var item in output.ResultData.OrderBy(x => x.SortOrder))
+                {
+                    FrequencyDropDowns.Add(item.Id, item.Name);
+                }
+            }
         }
         
-        if (_editingSession != null)
+        // Loss Types
+        var lossOutput = DbService.LossTypesQuery(new LossTypesQueryInput());
+        if (lossOutput.ReturnValue == LossTypesQueryOutput.Returns.Ok && lossOutput.ResultData != null)
         {
-            // Update existing
-            _editingSession.SessionName = _sessionForm.SessionName;
-            _editingSession.SessionDate = _sessionForm.SessionDate;
-            _editingSession.Frequency = _sessionForm.Frequency;
-            _editingSession.CountedBy = _sessionForm.CountedBy;
-            _editingSession.Notes = _sessionForm.Notes;
-            InventoryService.UpdateSession(_editingSession);
+            foreach (var lt in lossOutput.ResultData)
+            {
+                LossTypeNames[lt.Id] = lt.Name;
+            }
+        }
+        
+        // Categories
+        var catOutput = DbService.ProductCategoriesQuery(new ProductCategoriesQueryInput());
+        if (catOutput.ReturnValue == ProductCategoriesQueryOutput.Returns.Ok && catOutput.ResultData != null)
+        {
+            foreach (var c in catOutput.ResultData)
+            {
+                CategoryNames[c.Id] = c.Name;
+            }
+        }
+        
+        // Products
+        var prodOutput = DbService.ProductsQuery(new ProductsQueryInput());
+        if (prodOutput.ReturnValue == ProductsQueryOutput.Returns.Ok && prodOutput.ResultData != null)
+        {
+            ProductCache = prodOutput.ResultData.ToDictionary(p => p.Id);
+        }
+        
+        // Areas
+        var areasOutput = DbService.InventoryAreasQuery(new InventoryAreasQueryInput());
+        if (areasOutput.ReturnValue == InventoryAreasQueryOutput.Returns.Ok && areasOutput.ResultData != null)
+        {
+            Areas = areasOutput.ResultData.OrderBy(a => a.SortOrder).ToList();
+        }
+    }
+
+    protected void LoadData()
+    {
+        var queryOutput = DbService.InventorySessionsQuery(new InventorySessionsQueryInput());
+        if (queryOutput.ReturnValue == InventorySessionsQueryOutput.Returns.Ok)
+        {
+            SessionList = queryOutput.ResultData;
         }
         else
         {
-            // Create new
-            var session = new InventorySession
-            {
-                SessionName = _sessionForm.SessionName,
-                SessionDate = _sessionForm.SessionDate,
-                Frequency = _sessionForm.Frequency,
-                CountedBy = _sessionForm.CountedBy,
-                Notes = _sessionForm.Notes
-            };
-            
-            InventoryService.CreateSession(session, _copyPreviousData);
+            SessionList = new List<InventorySessionsQueryResult>();
         }
         
-        CloseModals();
-        LoadData();
-    }
-    
-    private void CompleteSession()
-    {
-        if (_activeSession != null)
+        FilterMessage = SessionList?.Count == 0 ? "No sessions found. Create your first session!" : "";
+        
+        // Load all items and losses for counts
+        var itemsOutput = DbService.InventoryItemsQuery(new InventoryItemsQueryInput());
+        if (itemsOutput.ReturnValue == InventoryItemsQueryOutput.Returns.Ok)
         {
-            InventoryService.CompleteSession(_activeSession.Id);
+            AllItems = itemsOutput.ResultData ?? new List<InventoryItemsQueryResult>();
         }
-        CloseModals();
-        LoadData();
-    }
-    
-    private void DeleteSession()
-    {
-        if (_sessionToDelete != null)
+        
+        var lossesOutput = DbService.LossRecordsQuery(new LossRecordsQueryInput());
+        if (lossesOutput.ReturnValue == LossRecordsQueryOutput.Returns.Ok)
         {
-            InventoryService.DeleteSession(_sessionToDelete.Id);
+            AllLosses = lossesOutput.ResultData ?? new List<LossRecordsQueryResult>();
         }
-        CloseModals();
-        LoadData();
-    }
-    
-    private void ViewSession(int sessionId)
-    {
-        _viewingSession = InventoryService.GetSession(sessionId);
-        if (_viewingSession != null)
+        
+        var countsOutput = DbService.AreaCountsQuery(new AreaCountsQueryInput());
+        if (countsOutput.ReturnValue == AreaCountsQueryOutput.Returns.Ok)
         {
-            _viewSummary = InventoryService.GetSessionSummary(sessionId);
-            _showViewModal = true;
+            AllAreaCounts = countsOutput.ResultData ?? new List<AreaCountsQueryResult>();
         }
     }
-    
-    private string GenerateSessionName()
+
+    protected int GetSessionItemCount(int sessionId) => AllItems.Count(i => i.SessionId == sessionId);
+    protected int GetSessionLossCount(int sessionId) => AllLosses.Count(l => l.SessionId == sessionId);
+
+    protected List<InventorySessionsQueryResult> GetFilteredSessions()
     {
-        var now = DateTime.Now;
-        var weekNumber = System.Globalization.CultureInfo.CurrentCulture.Calendar
-            .GetWeekOfYear(now, System.Globalization.CalendarWeekRule.FirstDay, DayOfWeek.Monday);
-        return $"Week {weekNumber} - {now:MMMM yyyy}";
+        if (SessionList == null) return new List<InventorySessionsQueryResult>();
+
+        var filtered = SessionList.AsEnumerable();
+
+        if (ShowCompleted.HasValue)
+            filtered = filtered.Where(s => s.IsComplete == ShowCompleted.Value);
+
+        return filtered.OrderByDescending(s => s.SessionDate).ToList();
     }
-    
-    private class SessionFormModel
+
+    protected void OpenAddSession()
     {
-        public string SessionName { get; set; } = string.Empty;
-        public DateTime SessionDate { get; set; } = DateTime.Now;
-        public InventoryFrequency Frequency { get; set; } = InventoryFrequency.Weekly;
-        public string CountedBy { get; set; } = string.Empty;
-        public string? Notes { get; set; }
+        IsNewSession = true;
+        FormErrorMessage = null;
+        DataToUpsert = new InventorySessionsUpsertInput
+        {
+            Id = 0,
+            SessionName = $"Week {GetWeekNumber(DateTime.Now)} - {DateTime.Now:MMMM yyyy}",
+            SessionDate = DateTime.Now,
+            CompletedAt = null,
+            Frequency = FrequencyDropDowns?.Keys.FirstOrDefault() ?? 1,
+            Notes = null,
+            IsComplete = false,
+            CountedBy = ""
+        };
+        ShowSessionModal = true;
+    }
+
+    protected int GetWeekNumber(DateTime date)
+    {
+        return System.Globalization.CultureInfo.CurrentCulture.Calendar.GetWeekOfYear(
+            date, 
+            System.Globalization.CalendarWeekRule.FirstDay, 
+            DayOfWeek.Sunday);
+    }
+
+    protected void EditSession(InventorySessionsQueryResult session)
+    {
+        IsNewSession = false;
+        FormErrorMessage = null;
+
+        var output = DbService.InventorySessionsById(new InventorySessionsByIdInput { Id = session.Id });
+        if (output.ReturnValue == InventorySessionsByIdOutput.Returns.Ok && output.ResultData != null)
+        {
+            var s = output.ResultData;
+            DataToUpsert = new InventorySessionsUpsertInput
+            {
+                Id = s.Id,
+                SessionName = s.SessionName,
+                SessionDate = s.SessionDate,
+                CompletedAt = s.CompletedAt,
+                Frequency = s.Frequency,
+                Notes = s.Notes,
+                IsComplete = s.IsComplete,
+                CountedBy = s.CountedBy
+            };
+            ShowSessionModal = true;
+        }
+    }
+
+    protected void OpenSessionSummary(InventorySessionsQueryResult session)
+    {
+        SelectedSession = session;
+        
+        // Load session-specific data
+        SummaryItems = AllItems.Where(i => i.SessionId == session.Id).ToList();
+        SummaryLosses = AllLosses.Where(l => l.SessionId == session.Id).ToList();
+        
+        var itemIds = SummaryItems.Select(i => i.Id).ToHashSet();
+        SummaryAreaCounts = AllAreaCounts.Where(c => itemIds.Contains(c.InventoryItemId)).ToList();
+        
+        // Calculate totals
+        SummaryTotalOnHand = SummaryAreaCounts.Sum(c => c.FullUnits + (c.HasPartial ? c.PartialAmount / 10m : 0));
+        SummaryInventoryValue = SummaryItems.Sum(i => GetItemTotalCount(i.Id) * i.UnitCost);
+        
+        // Count variances
+        SummaryVarianceCount = 0;
+        foreach (var item in SummaryItems)
+        {
+            var counted = GetItemTotalCount(item.Id);
+            var available = item.StartingQuantity + item.ReceivedQuantity;
+            var variance = counted - available + item.ComputerSold;
+            if (Math.Abs(variance) > 0.5m) SummaryVarianceCount++;
+        }
+        
+        ShowSummaryModal = true;
+    }
+
+    protected decimal GetItemTotalCount(int itemId)
+    {
+        return SummaryAreaCounts
+            .Where(c => c.InventoryItemId == itemId)
+            .Sum(c => c.FullUnits + (c.HasPartial ? c.PartialAmount / 10m : 0));
+    }
+
+    protected void CloseSummaryModal()
+    {
+        ShowSummaryModal = false;
+        SelectedSession = null;
+    }
+
+    protected void CloseModal()
+    {
+        ShowSessionModal = false;
+        DataToUpsert = null;
+        FormErrorMessage = null;
+    }
+
+    protected void SaveSession()
+    {
+        if (DataToUpsert == null) return;
+
+        if (string.IsNullOrWhiteSpace(DataToUpsert.SessionName))
+        {
+            FormErrorMessage = "Session name is required.";
+            return;
+        }
+
+        if (DataToUpsert.IsComplete == true && DataToUpsert.CompletedAt == null)
+        {
+            DataToUpsert.CompletedAt = DateTime.Now;
+        }
+
+        if (!DataToUpsert.IsValid())
+        {
+            FormErrorMessage = string.Join(" ", DataToUpsert.ValidationResults.Select(item => item));
+            return;
+        }
+
+        var output = DbService.InventorySessionsUpsert(DataToUpsert);
+        if (output.ReturnValue == InventorySessionsUpsertOutput.Returns.Ok)
+        {
+            LoadData();
+            CloseModal();
+        }
+        else
+        {
+            FormErrorMessage = "Error saving session.";
+        }
+    }
+
+    protected void DeleteSession()
+    {
+        if (DataToUpsert?.Id == null || DataToUpsert.Id == 0) return;
+
+        var deleteInput = new InventorySessionsDeleteInput { Id = DataToUpsert.Id.Value };
+        var output = DbService.InventorySessionsDelete(deleteInput);
+
+        if (output.ReturnValue == InventorySessionsDeleteOutput.Returns.Ok)
+        {
+            LoadData();
+            CloseModal();
+        }
+        else
+        {
+            FormErrorMessage = "Error deleting session. It may have inventory items attached.";
+        }
+    }
+
+    protected string GetFrequencyName(int frequencyId)
+    {
+        if (FrequencyDropDowns != null && FrequencyDropDowns.TryGetValue(frequencyId, out var name))
+            return name;
+        return "Unknown";
+    }
+
+    protected ProductsQueryResult? GetProduct(int productId) => ProductCache.GetValueOrDefault(productId);
+
+    protected string GetCategoryIcon(int category)
+    {
+        var name = CategoryNames.GetValueOrDefault(category, "").ToLower();
+        return name switch
+        {
+            var n when n.Contains("spirit") || n.Contains("liquor") => "🥃",
+            var n when n.Contains("wine") => "🍷",
+            var n when n.Contains("beer") => "🍺",
+            var n when n.Contains("mixer") => "🧃",
+            _ => "📦"
+        };
+    }
+
+    protected string GetLossTypeName(int typeId) => LossTypeNames.GetValueOrDefault(typeId, "Unknown");
+
+    protected string GetLossTypeIcon(int typeId)
+    {
+        var name = GetLossTypeName(typeId).ToLower();
+        return name switch
+        {
+            var n when n.Contains("break") => "💔",
+            var n when n.Contains("spoil") || n.Contains("waste") => "🗑️",
+            var n when n.Contains("spill") => "💧",
+            var n when n.Contains("comp") => "🎁",
+            var n when n.Contains("return") => "↩️",
+            var n when n.Contains("error") => "❌",
+            var n when n.Contains("theft") => "🚨",
+            _ => "📋"
+        };
     }
 }
