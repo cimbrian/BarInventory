@@ -1,147 +1,285 @@
 @page "/"
 @using BarInventory.BarDB.Models
+@inject IJSRuntime JS
 
-<PageTitle>Dashboard - Bar Inventory</PageTitle>
+<PageTitle>@(_isLoggedIn ? "Dashboard" : "Login") - Bar Inventory</PageTitle>
 
-<div class="page-header">
-    <h1 class="page-title">Dashboard</h1>
-    <p class="page-subtitle">@DateTime.Now.ToString("dddd, MMMM d, yyyy")</p>
-</div>
-
-@* Stats Cards *@
-<div class="stats-grid mb-lg">
-    <div class="stat-card">
-        <div class="stat-icon">📦</div>
-        <div class="stat-content">
-            <div class="stat-value">@ProductCount</div>
-            <div class="stat-label">Products</div>
-        </div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-icon">📋</div>
-        <div class="stat-content">
-            <div class="stat-value">@ActiveSessionCount</div>
-            <div class="stat-label">Active Sessions</div>
-        </div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-icon">📍</div>
-        <div class="stat-content">
-            <div class="stat-value">@AreaCount</div>
-            <div class="stat-label">Inventory Areas</div>
-        </div>
-    </div>
-    <div class="stat-card stat-card-warning">
-        <div class="stat-icon">📉</div>
-        <div class="stat-content">
-            <div class="stat-value">@TotalLossValue.ToString("C0")</div>
-            <div class="stat-label">Total Losses (This Month)</div>
-        </div>
-    </div>
-</div>
-
-@* Quick Actions *@
-<div class="card mb-lg">
-    <div class="card-header">
-        <h2 class="card-title">Quick Actions</h2>
-    </div>
-    <div class="card-body">
-        <div class="d-flex gap-md" style="flex-wrap: wrap;">
-            <a href="/capture" class="btn btn-primary">
-                📱 Start Counting
-            </a>
-            <a href="/sessions" class="btn btn-outline">
-                📋 View Sessions
-            </a>
-            <a href="/products" class="btn btn-outline">
-                📦 Manage Products
-            </a>
-            <a href="/losses" class="btn btn-outline">
-                📉 Record Loss
-            </a>
-            <a href="/settings" class="btn btn-outline">
-                ⚙️ Settings
-            </a>
-            <a href="/training" class="btn btn-ghost">
-                📚 Training Guide
-            </a>
-        </div>
-    </div>
-</div>
-
-@* Active Session *@
-@if (ActiveSession != null)
+@if (!_isLoggedIn)
 {
+    @* Login Screen *@
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <span class="login-icon">🍸</span>
+                <h1 class="login-title">CzarWare</h1>
+                <p class="login-subtitle">Bar Inventory System</p>
+            </div>
+            
+            @if (!string.IsNullOrEmpty(_loginError))
+            {
+                <div class="alert alert-danger mb-md">@_loginError</div>
+            }
+            
+            <div class="login-form">
+                <div class="form-group">
+                    <label class="form-label">Username</label>
+                    <input type="text" class="form-control" @bind="_username" @bind:event="oninput"
+                           placeholder="Enter username" @onkeypress="HandleKeyPress" />
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" class="form-control" @bind="_password" @bind:event="oninput"
+                           placeholder="Enter password" @onkeypress="HandleKeyPress" />
+                </div>
+                
+                <button class="btn btn-primary btn-block" @onclick="AttemptLogin" disabled="@_isLoggingIn">
+                    @if (_isLoggingIn)
+                    {
+                        <span>Signing in...</span>
+                    }
+                    else
+                    {
+                        <span>🔐 Sign In</span>
+                    }
+                </button>
+            </div>
+            
+            <div class="login-footer">
+                <p class="text-muted">Session expires after 30 days</p>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    @* Dashboard *@
+    <div class="page-header">
+        <h1 class="page-title">Dashboard</h1>
+        <p class="page-subtitle">@DateTime.Now.ToString("dddd, MMMM d, yyyy")</p>
+    </div>
+
+    @* Stats Cards *@
+    <div class="stats-grid mb-lg">
+        <div class="stat-card">
+            <div class="stat-icon">📦</div>
+            <div class="stat-content">
+                <div class="stat-value">@ProductCount</div>
+                <div class="stat-label">Products</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">📋</div>
+            <div class="stat-content">
+                <div class="stat-value">@ActiveSessionCount</div>
+                <div class="stat-label">Active Sessions</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">📍</div>
+            <div class="stat-content">
+                <div class="stat-value">@AreaCount</div>
+                <div class="stat-label">Inventory Areas</div>
+            </div>
+        </div>
+        <div class="stat-card stat-card-warning">
+            <div class="stat-icon">📉</div>
+            <div class="stat-content">
+                <div class="stat-value">@TotalLossValue.ToString("C0")</div>
+                <div class="stat-label">Total Losses (This Month)</div>
+            </div>
+        </div>
+    </div>
+
+    @* Quick Actions *@
     <div class="card mb-lg">
-        <div class="card-header d-flex justify-between align-center">
-            <h2 class="card-title">Current Session</h2>
-            <span class="item-badge badge-warning">🔄 In Progress</span>
+        <div class="card-header">
+            <h2 class="card-title">Quick Actions</h2>
         </div>
         <div class="card-body">
-            <div class="d-flex gap-lg" style="flex-wrap: wrap;">
-                <div>
-                    <div class="text-muted" style="font-size: 0.85rem;">Session Name</div>
-                    <div style="font-weight: 500; font-size: 1.1rem;">@ActiveSession.SessionName</div>
-                </div>
-                <div>
-                    <div class="text-muted" style="font-size: 0.85rem;">Date</div>
-                    <div style="font-weight: 500;">@ActiveSession.SessionDate.ToString("MMM dd, yyyy")</div>
-                </div>
-                <div>
-                    <div class="text-muted" style="font-size: 0.85rem;">Counted By</div>
-                    <div style="font-weight: 500;">@(string.IsNullOrEmpty(ActiveSession.CountedBy) ? "-" : ActiveSession.CountedBy)</div>
-                </div>
-            </div>
-            <div class="mt-md">
+            <div class="d-flex gap-md" style="flex-wrap: wrap;">
                 <a href="/capture" class="btn btn-primary">
-                    Continue Counting →
+                    📱 Start Counting
+                </a>
+                <a href="/sessions" class="btn btn-outline">
+                    📋 View Sessions
+                </a>
+                <a href="/products" class="btn btn-outline">
+                    📦 Manage Products
+                </a>
+                <a href="/losses" class="btn btn-outline">
+                    📉 Record Loss
+                </a>
+                <a href="/settings" class="btn btn-outline">
+                    ⚙️ Settings
+                </a>
+                <a href="/training" class="btn btn-ghost">
+                    📚 Training Guide
                 </a>
             </div>
         </div>
     </div>
-}
 
-@* Recent Loss Records *@
-@if (RecentLosses != null && RecentLosses.Any())
-{
-    <div class="card">
-        <div class="card-header d-flex justify-between align-center">
-            <h2 class="card-title">Recent Losses</h2>
-            <a href="/losses" class="btn btn-ghost btn-sm">View All →</a>
-        </div>
-        <div class="card-body" style="padding: 0;">
-            <div class="table-wrapper">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Product</th>
-                            <th>Type</th>
-                            <th class="number">Value</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var loss in RecentLosses)
-                        {
-                            <tr>
-                                <td>@loss.OccurredAt.ToString("MMM dd")</td>
-                                <td>@GetProductName(loss.ProductId)</td>
-                                <td>
-                                    <span class="item-badge">@GetLossTypeName(loss.LossType)</span>
-                                </td>
-                                <td class="number">@loss.EstimatedValue.ToString("C2")</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+    @* Active Session *@
+    @if (ActiveSession != null)
+    {
+        <div class="card mb-lg">
+            <div class="card-header d-flex justify-between align-center">
+                <h2 class="card-title">Current Session</h2>
+                <span class="item-badge badge-warning">🔄 In Progress</span>
+            </div>
+            <div class="card-body">
+                <div class="d-flex gap-lg" style="flex-wrap: wrap;">
+                    <div>
+                        <div class="text-muted" style="font-size: 0.85rem;">Session Name</div>
+                        <div style="font-weight: 500; font-size: 1.1rem;">@ActiveSession.SessionName</div>
+                    </div>
+                    <div>
+                        <div class="text-muted" style="font-size: 0.85rem;">Date</div>
+                        <div style="font-weight: 500;">@ActiveSession.SessionDate.ToString("MMM dd, yyyy")</div>
+                    </div>
+                    <div>
+                        <div class="text-muted" style="font-size: 0.85rem;">Counted By</div>
+                        <div style="font-weight: 500;">@(string.IsNullOrEmpty(ActiveSession.CountedBy) ? "-" : ActiveSession.CountedBy)</div>
+                    </div>
+                </div>
+                <div class="mt-md">
+                    <a href="/capture" class="btn btn-primary">
+                        Continue Counting →
+                    </a>
+                </div>
             </div>
         </div>
-    </div>
+    }
+
+    @* Recent Loss Records *@
+    @if (RecentLosses != null && RecentLosses.Any())
+    {
+        <div class="card">
+            <div class="card-header d-flex justify-between align-center">
+                <h2 class="card-title">Recent Losses</h2>
+                <a href="/losses" class="btn btn-ghost btn-sm">View All →</a>
+            </div>
+            <div class="card-body" style="padding: 0;">
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Product</th>
+                                <th>Type</th>
+                                <th class="number">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var loss in RecentLosses)
+                            {
+                                <tr>
+                                    <td>@loss.OccurredAt.ToString("MMM dd")</td>
+                                    <td>@GetProductName(loss.ProductId)</td>
+                                    <td>
+                                        <span class="item-badge">@GetLossTypeName(loss.LossType)</span>
+                                    </td>
+                                    <td class="number">@loss.EstimatedValue.ToString("C2")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
 }
+
+<style>
+    .login-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        padding: 1rem;
+        background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+    }
+    
+    .login-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        padding: 2.5rem;
+        width: 100%;
+        max-width: 400px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    }
+    
+    .login-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    
+    .login-icon {
+        font-size: 4rem;
+        display: block;
+        margin-bottom: 1rem;
+    }
+    
+    .login-title {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin: 0 0 0.5rem 0;
+    }
+    
+    .login-subtitle {
+        color: var(--text-secondary);
+        margin: 0;
+        font-size: 1rem;
+    }
+    
+    .login-form {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .login-form .form-control {
+        padding: 0.875rem 1rem;
+        font-size: 1rem;
+    }
+    
+    .btn-block {
+        width: 100%;
+        padding: 0.875rem;
+        font-size: 1rem;
+        margin-top: 0.5rem;
+    }
+    
+    .login-footer {
+        text-align: center;
+        margin-top: 1.5rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--border-color);
+    }
+    
+    .login-footer p {
+        margin: 0;
+        font-size: 0.85rem;
+    }
+</style>
 
 @code {
     [Inject]
     private BarInventory.BarDB.Service DbService { get; set; } = default!;
+
+    // Auth state
+    private bool _isLoggedIn = false;
+    private bool _isLoggingIn = false;
+    private string _username = "";
+    private string _password = "";
+    private string _loginError = "";
+    
+    // Valid credentials
+    private const string ValidUsername = "MartiniCzar";
+    private const string ValidPassword = "count$";
 
     // Dashboard Stats
     protected int ProductCount = 0;
@@ -163,9 +301,71 @@
     {
         if (firstRender)
         {
-            LoadDashboardData();
+            try
+            {
+                _isLoggedIn = await JS.InvokeAsync<bool>("authHelper.isLoggedIn");
+            }
+            catch
+            {
+                _isLoggedIn = false;
+            }
+            
+            if (_isLoggedIn)
+            {
+                LoadDashboardData();
+            }
+            
             StateHasChanged();
         }
+    }
+
+    private async Task HandleKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await AttemptLogin();
+        }
+    }
+
+    private async Task AttemptLogin()
+    {
+        _loginError = "";
+        _isLoggingIn = true;
+        StateHasChanged();
+        
+        // Small delay for UX
+        await Task.Delay(300);
+        
+        if (string.IsNullOrWhiteSpace(_username) || string.IsNullOrWhiteSpace(_password))
+        {
+            _loginError = "Please enter both username and password.";
+            _isLoggingIn = false;
+            return;
+        }
+        
+        if (_username == ValidUsername && _password == ValidPassword)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("authHelper.setLoginInfo", _username);
+                _isLoggedIn = true;
+                LoadDashboardData();
+                
+                // Force navigation to refresh the layout
+                await JS.InvokeVoidAsync("eval", "window.location.reload()");
+            }
+            catch (Exception ex)
+            {
+                _loginError = "Login failed. Please try again.";
+                Console.WriteLine($"Login error: {ex.Message}");
+            }
+        }
+        else
+        {
+            _loginError = "Invalid username or password.";
+        }
+        
+        _isLoggingIn = false;
     }
 
     protected void LoadDashboardData()

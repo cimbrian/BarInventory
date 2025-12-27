@@ -1,47 +1,81 @@
 @inherits LayoutComponentBase
-<div class="page">
-    <nav class="top-nav">
-        <div class="nav-container">
-            <a href="/" class="nav-brand">
-                <span class="nav-brand-icon">🍸</span>
-                <span class="nav-brand-text">CzarWare</span>
-            </a>
-            <div class="nav-links">
-                <NavLink href="/" class="nav-link" Match="NavLinkMatch.All">
-                    <span class="nav-icon">📊</span>
-                    <span class="nav-text">Dashboard</span>
-                </NavLink>
-                <NavLink href="/capture" class="nav-link">
-                    <span class="nav-icon">📝</span>
-                    <span class="nav-text">Capture</span>
-                </NavLink>
-                <NavLink href="/lookup" class="nav-link">
-                    <span class="nav-icon">🔍</span>
-                    <span class="nav-text">Lookup</span>
-                </NavLink>
-                <NavLink href="/losses" class="nav-link">
-                    <span class="nav-icon">📉</span>
-                    <span class="nav-text">Losses</span>
-                </NavLink>
-                <NavLink href="/products" class="nav-link">
-                    <span class="nav-icon">📦</span>
-                    <span class="nav-text">Products</span>
-                </NavLink>
-                <NavLink href="/sessions" class="nav-link">
-                    <span class="nav-icon">📅</span>
-                    <span class="nav-text">Sessions</span>
-                </NavLink>
-                @* <NavLink href="/settings" class="nav-link">
-                    <span class="nav-icon">⚙️</span>
-                    <span class="nav-text">Settings</span>
-                </NavLink> *@
+@inject IJSRuntime JS
+
+@if (_isLoggedIn)
+{
+    <div class="page">
+        <nav class="top-nav">
+            <div class="nav-container">
+                <a href="/" class="nav-brand">
+                    <span class="nav-brand-icon">🍸</span>
+                    <span class="nav-brand-text">CzarWare</span>
+                </a>
+                <div class="nav-links">
+                    <NavLink href="/" class="nav-link" Match="NavLinkMatch.All">
+                        <span class="nav-icon">📊</span>
+                        <span class="nav-text">Dashboard</span>
+                    </NavLink>
+                    <NavLink href="/capture" class="nav-link">
+                        <span class="nav-icon">📝</span>
+                        <span class="nav-text">Capture</span>
+                    </NavLink>
+                    <NavLink href="/lookup" class="nav-link">
+                        <span class="nav-icon">🔍</span>
+                        <span class="nav-text">Lookup</span>
+                    </NavLink>
+                    <NavLink href="/losses" class="nav-link">
+                        <span class="nav-icon">📉</span>
+                        <span class="nav-text">Losses</span>
+                    </NavLink>
+                    <NavLink href="/products" class="nav-link">
+                        <span class="nav-icon">📦</span>
+                        <span class="nav-text">Products</span>
+                    </NavLink>
+                    <NavLink href="/sessions" class="nav-link">
+                        <span class="nav-icon">📅</span>
+                        <span class="nav-text">Sessions</span>
+                    </NavLink>
+                    <NavLink href="/settings" class="nav-link">
+                        <span class="nav-icon">⚙️</span>
+                        <span class="nav-text">Settings</span>
+                    </NavLink>
+                </div>
             </div>
-        </div>
-    </nav>
-    <main class="main-content">
-        @Body
-    </main>
-</div>
+        </nav>
+        <main class="main-content">
+            @Body
+        </main>
+    </div>
+}
+else
+{
+    <div class="page">
+        <main class="main-content">
+            @Body
+        </main>
+    </div>
+}
+
+@code {
+    private bool _isLoggedIn = false;
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _isLoggedIn = await JS.InvokeAsync<bool>("authHelper.isLoggedIn");
+            }
+            catch
+            {
+                _isLoggedIn = false;
+            }
+            StateHasChanged();
+        }
+    }
+}
+
 <style>
     /* Error UI styling */
     #blazor-error-ui {
