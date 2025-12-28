@@ -279,7 +279,7 @@ else
     private BarInventory.BarDB.Service DbService { get; set; } = default!;
 
     // Auth state
-    private bool _isLoggedIn = false;
+    private bool _isLoggedIn = true;
     private bool _isLoggingIn = false;
     private string _username = "";
     private string _password = "";
@@ -415,7 +415,7 @@ else
             var thisMonth = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
             var monthlyLosses = lossesOutput.ResultData.Where(l => l.OccurredAt >= thisMonth).ToList();
             TotalLossValue = monthlyLosses.Sum(l => l.EstimatedValue);
-            RecentLosses = lossesOutput.ResultData.OrderByDescending(l => l.OccurredAt).Take(15).ToList();
+            RecentLosses = lossesOutput.ResultData.OrderByDescending(l => l.OccurredAt).Take(5).ToList();
         }
     }
 

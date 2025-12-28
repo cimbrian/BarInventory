@@ -405,7 +405,7 @@
             }
             else
             {
-                _losses = lossesOutput.ResultData.OrderByDescending(l => l.OccurredAt).Take(2000).ToList();
+                _losses = lossesOutput.ResultData.OrderByDescending(l => l.OccurredAt).Take(20).ToList();
             }
             
             _totalLossValue = _losses.Sum(l => l.EstimatedValue);

@@ -139,6 +139,13 @@
         font-size: 1.25rem;
         font-weight: 700;
         color: #4a90d9;
+        display: inline-block;
+    }
+    .area-value {
+        font-size: 0.75rem;
+        color: #666;
+        margin-left: 0.5rem;
+        display: inline-block;
     }
     @@media print {
         .no-print { display: none !important; }
@@ -241,9 +248,13 @@ else
                 @foreach (var area in AreaTotals.OrderBy(a => Areas.FirstOrDefault(ar => ar.Id == a.Key)?.SortOrder ?? 99))
                 {
                     var areaInfo = Areas.FirstOrDefault(a => a.Id == area.Key);
+                    var areaValue = AreaValues.GetValueOrDefault(area.Key, 0);
                     <div class="area-box">
                         <div class="area-name">@(areaInfo?.Name ?? "Unknown")</div>
-                        <div class="area-count">@area.Value.ToString("0.0")</div>
+                        <div>
+                            <span class="area-count">@area.Value.ToString("0.0")</span>
+                            <span class="area-value">@areaValue.ToString("C0")</span>
+                        </div>
                     </div>
                 }
             </div>
@@ -254,13 +265,15 @@ else
         <table class="data-table">
             <thead>
                 <tr>
-                    <th style="width: 5%"></th>
-                    <th style="width: 35%">Product</th>
-                    <th class="text-right" style="width: 12%">Start</th>
-                    <th class="text-right" style="width: 12%">Recv'd</th>
-                    <th class="text-right" style="width: 12%">Available</th>
-                    <th class="text-right" style="width: 12%">Counted</th>
-                    <th class="text-right" style="width: 12%">Variance</th>
+                    <th style="width: 3%"></th>
+                    <th style="width: 24%">Product</th>
+                    <th class="text-right" style="width: 9%">Start</th>
+                    <th class="text-right" style="width: 9%">Recv'd</th>
+                    <th class="text-right" style="width: 9%">Available</th>
+                    <th class="text-right" style="width: 9%">Counted</th>
+                    <th class="text-right" style="width: 11%">Value</th>
+                    <th class="text-right" style="width: 9%">Variance</th>
+                    <th class="text-right" style="width: 11%">Var $</th>
                 </tr>
             </thead>
             <tbody>
@@ -270,6 +283,8 @@ else
                     var counted = GetItemTotalCount(item.Id);
                     var available = item.StartingQuantity + item.ReceivedQuantity;
                     var variance = counted - available + item.ComputerSold;
+                    var itemValue = counted * item.UnitCost;
+                    var varianceValue = variance * item.UnitCost;
                     <tr>
                         <td class="text-center">@GetCategoryIcon(product?.Category ?? 0)</td>
                         <td>
@@ -283,8 +298,12 @@ else
                         <td class="text-right">@item.ReceivedQuantity.ToString("0.0")</td>
                         <td class="text-right">@available.ToString("0.0")</td>
                         <td class="text-right">@counted.ToString("0.0")</td>
+                        <td class="text-right">@itemValue.ToString("C2")</td>
                         <td class="text-right @(variance < 0 ? "variance-negative" : variance > 0 ? "variance-positive" : "")">
                             @(variance > 0 ? "+" : "")@variance.ToString("0.0")
+                        </td>
+                        <td class="text-right @(varianceValue < 0 ? "variance-negative" : varianceValue > 0 ? "variance-positive" : "")">
+                            @(varianceValue > 0 ? "+" : "")@varianceValue.ToString("C0")
                         </td>
                     </tr>
                 }
@@ -357,6 +376,7 @@ else
     private decimal InventoryValue = 0;
     private int VarianceCount = 0;
     private Dictionary<int, decimal> AreaTotals = new();
+    private Dictionary<int, decimal> AreaValues = new();
 
     protected override void OnInitialized()
     {
@@ -452,6 +472,7 @@ else
         InventoryValue = 0;
         VarianceCount = 0;
         AreaTotals.Clear();
+        AreaValues.Clear();
 
         foreach (var item in SessionItems)
         {
@@ -468,13 +489,22 @@ else
 
         TotalLossValue = SessionLosses.Sum(l => l.EstimatedValue);
 
-        // Calculate area totals
+        // Calculate area totals and values
         foreach (var count in AllAreaCounts)
         {
             var total = count.FullUnits + (count.PartialAmount / 10m);
             if (!AreaTotals.ContainsKey(count.AreaId))
                 AreaTotals[count.AreaId] = 0;
             AreaTotals[count.AreaId] += total;
+            
+            // Calculate value for this area count
+            var item = SessionItems.FirstOrDefault(i => i.Id == count.InventoryItemId);
+            if (item != null)
+            {
+                if (!AreaValues.ContainsKey(count.AreaId))
+                    AreaValues[count.AreaId] = 0;
+                AreaValues[count.AreaId] += total * item.UnitCost;
+            }
         }
     }
 
